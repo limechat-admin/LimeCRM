@@ -211,7 +211,8 @@ Explicitly **not** building now: email sequences, dialer and call recording, con
     - Reaching Qualified Meeting or SQL auto-creates the company's deal at the matching stage (or reuses its open deal).
 - **In progress:** Salesmate export and transform, waiting on a rotated API token.
 - **Also done (2026-10-21):** Reports v1 (MRR booked, pipeline/forecast, SDR funnel, customer book and churn, onboarding throughput) · per-user API keys, REST v1 and an MCP server at /api/v1/mcp · **My work** (tasks with due dates: overdue/today/upcoming, Mine/Team; stale open deals with no touch in 14+ days) · **global search** (header, ⌘K) across companies, deals and people.
-- **Not done yet:** CSV import/export · saved views · Slack (stage-change posts, client-o channel on handoff) · Google Calendar · churn alerts and scheduled reminders (email/Slack) · Chargebee and Helpdesk links · Salesmate cutover.
+- **Also done:** CSV export of deals, companies and leads (leads keep the page filters; formula-safe) · lead CSV import (auto-matched columns, preview with per-row problems, skips people already in LimeCRM by email, SDR/AE by email).
+- **Not done yet:** saved views · Slack (stage-change posts, client-o channel on handoff) · Google Calendar · churn alerts and scheduled reminders (email/Slack) · Chargebee and Helpdesk links · Salesmate cutover.
 
 | Phase | Weeks | Scope | Exit criteria |
 |---|---|---|---|

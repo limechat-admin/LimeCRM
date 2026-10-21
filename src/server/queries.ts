@@ -179,7 +179,7 @@ export type LeadFilters = { q?: string; status?: string; ownerId?: string; sdrId
 const LEAD_PAGE_SIZE = 100;
 
 /** Leads (contacts with a lead status), newest activity first, with per-status counts for the filters. */
-export async function listLeads(f: LeadFilters) {
+export async function listLeads(f: LeadFilters, limit = LEAD_PAGE_SIZE) {
   const owner = alias(users, "owner");
   const sdr = alias(users, "sdr");
   const conds: SQL[] = [];
@@ -201,7 +201,7 @@ export async function listLeads(f: LeadFilters) {
       .leftJoin(sdr, eq(sdr.id, contacts.sdrId))
       .where(where)
       .orderBy(desc(contacts.updatedAt))
-      .limit(LEAD_PAGE_SIZE),
+      .limit(limit),
     db
       .select({ status: contacts.leadStatus, n: count() })
       .from(contacts)

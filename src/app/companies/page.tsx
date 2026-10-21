@@ -1,20 +1,5 @@
-import {
-  Card,
-  Grid,
-  GridCol,
-  Select,
-  SimpleGrid,
-  Stack,
-  Table,
-  TableScrollContainer,
-  TableTbody,
-  TableTd,
-  TableTh,
-  TableThead,
-  TableTr,
-  Text,
-  TextInput,
-} from "@mantine/core";
+import { Button, Card, Grid, GridCol, Select, SimpleGrid, Stack, Table, TableScrollContainer, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, TextInput } from "@mantine/core";
+import { Download } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createOrganizationAction } from "@/app/actions";
@@ -35,7 +20,15 @@ export default async function CompaniesPage() {
 
   return (
     <>
-      <PageHeader title="Companies" subtitle="One record per customer: lifecycle, owners and contracted MRR." />
+      <PageHeader
+        title="Companies"
+        subtitle="One record per customer: lifecycle, owners and contracted MRR."
+        actions={
+          <Button component="a" href="/export/companies.csv" variant="default" size="xs" leftSection={<Download size={14} />}>
+            Export CSV
+          </Button>
+        }
+      />
       <SimpleGrid cols={{ base: 2, md: 4 }} mb="lg">
         <MetricCard label="Customers" value={customers.length} hint="Onboarding, active or on hold" />
         <MetricCard label="Contracted MRR" value={inr(bookMrr)} />

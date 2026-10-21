@@ -1,5 +1,5 @@
-import { Group, SimpleGrid, Stack, Text } from "@mantine/core";
-import { CalendarDays } from "lucide-react";
+import { Button, Group, SimpleGrid, Stack, Text } from "@mantine/core";
+import { CalendarDays, Download } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import classes from "@/components/board.module.css";
@@ -23,7 +23,15 @@ export default async function DealsPage() {
 
   return (
     <>
-      <PageHeader title="Deals" subtitle="Every sale from qualified meeting to handover. MRR is monthly, in INR." />
+      <PageHeader
+        title="Deals"
+        subtitle="Every sale from qualified meeting to handover. MRR is monthly, in INR."
+        actions={
+          <Button component="a" href="/export/deals.csv" variant="default" size="xs" leftSection={<Download size={14} />}>
+            Export CSV
+          </Button>
+        }
+      />
       <SimpleGrid cols={{ base: 2, md: 4 }} mb="lg">
         <MetricCard label="Open deals" value={openCount} />
         <MetricCard label="Pipeline MRR" value={inr(openValue)} />

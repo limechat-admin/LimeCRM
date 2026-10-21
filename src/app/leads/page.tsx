@@ -1,4 +1,5 @@
 import {
+  Button,
   Card,
   Grid,
   GridCol,
@@ -16,7 +17,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { Search } from "lucide-react";
+import { Download, Search, Upload } from "lucide-react";
 import type { Metadata } from "next";
 import { createLeadAction } from "@/app/actions";
 import classes from "@/components/board.module.css";
@@ -50,7 +51,20 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Leads" subtitle="People the SDRs are working, from first touch to qualified meeting and SQL." />
+      <PageHeader
+        title="Leads"
+        subtitle="People the SDRs are working, from first touch to qualified meeting and SQL."
+        actions={
+          <Group gap="xs">
+            <Button component="a" href={`/export/leads.csv${href(filters, {}).replace("/leads", "")}`} variant="default" size="xs" leftSection={<Download size={14} />}>
+              Export CSV
+            </Button>
+            <LinkButton href="/leads/import" size="xs" leftSection={<Upload size={14} />}>
+              Import CSV
+            </LinkButton>
+          </Group>
+        }
+      />
       <SimpleGrid cols={{ base: 2, md: 4 }} mb="lg">
         <MetricCard label="Leads" value={total} hint={filters.ownerId || filters.sdrId || filters.q ? "Matching filters" : undefined} />
         <MetricCard label="Being worked" value={working} hint="Not contacted → meeting scheduled" />

@@ -32,15 +32,16 @@ export type NewLead = {
   source: string | null;
   ownerId: string | null;
   sdrId: string | null;
+  linkedinUrl?: string | null;
 };
 
 export async function createLead(input: NewLead, actorId: string) {
   return db.transaction(async (tx) => {
     const orgId = await findOrCreateOrg(tx, input.companyName, input.website, input.ownerId, actorId);
-    const { name, email, phone, designation, source, ownerId, sdrId } = input;
+    const { name, email, phone, designation, source, ownerId, sdrId, linkedinUrl } = input;
     const [lead] = await tx
       .insert(contacts)
-      .values({ name, email, phone, designation, source, ownerId, sdrId, orgId, leadStatus: "not_contacted", leadStage: "lead" })
+      .values({ name, email, phone, designation, source, ownerId, sdrId, linkedinUrl, orgId, leadStatus: "not_contacted", leadStage: "lead" })
       .returning();
     await recordEvent(tx, { entityType: "contact", entityId: lead.id, orgId, actorId, action: "created", data: { name: lead.name } });
     return lead;

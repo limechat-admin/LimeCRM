@@ -32,6 +32,8 @@ import {
 } from "@/server/mutations";
 import { isLeadStatus, LEAD_STAGES } from "@/domain/leads";
 import { dueAtFromDay } from "@/domain/work";
+import { MAX_IMPORT_ROWS } from "@/domain/csv";
+import { importLeads, type ImportSummary } from "@/server/import";
 import { createLead, setLeadStatus, updateLead } from "@/server/leads";
 import { churnOrganization, transitionDeal, transitionOnboarding } from "@/server/transitions";
 
@@ -391,4 +393,36 @@ export async function moveLeadAction(_: ActionState, fd: FormData): Promise<Acti
   if (res.dealCreated) return { ok: true, message: "Deal created for this company" };
   if (res.dealId) return { ok: true, message: "Linked to the company's open deal" };
   return { ok: true };
+}
+
+// ---------- import ----------
+
+const importRow = z.object({
+  row: z.number().int().positive(),
+  data: z.object({
+    name: z.string().trim().min(1),
+    companyName: z.string().trim().min(1),
+    email: z.string().email().nullable(),
+    phone: z.string().nullable(),
+    designation: z.string().nullable(),
+    website: z.string().nullable(),
+    source: z.string().nullable(),
+    sdrEmail: z.string().email().nullable(),
+    ownerEmail: z.string().email().nullable(),
+    linkedinUrl: z.string().nullable(),
+  }),
+});
+
+export type ImportResult = { ok: true; summary: ImportSummary } | { ok: false; message: string };
+
+/** Called from the lead importer with rows already mapped and checked in the browser; re-validated here. */
+export async function importLeadsAction(rows: unknown): Promise<ImportResult> {
+  const user = await getCurrentUser();
+  const denial = canWrite(user.role);
+  if (!denial.ok) return { ok: false, message: denial.message };
+  const parsed = z.array(importRow).max(MAX_IMPORT_ROWS).safeParse(rows);
+  if (!parsed.success) return { ok: false, message: `Some rows didn't validate: ${parsed.error.issues[0]?.message ?? "invalid data"}` };
+  const summary = await importLeads(parsed.data, user.id);
+  revalidatePath("/", "layout");
+  return { ok: true, summary };
 }
