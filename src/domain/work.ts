@@ -42,3 +42,12 @@ export function isStale(lastTouch: Date | null, now: Date, days = STALE_DEAL_DAY
 export function dueAtFromDay(day: string): Date {
   return new Date(`${day}T18:00:00+05:30`);
 }
+
+/**
+ * A Salesmate deal number or link ("14997", "limechat.salesmate.io/#/app/deals/14997/detail"),
+ * so old links pasted from Slack or docs still find the record.
+ */
+export function salesmateDealNumber(q: string): number | null {
+  const m = q.trim().match(/^#?(\d{1,7})$/) ?? q.match(/salesmate\.io\/.*deals\/(\d{1,7})/);
+  return m ? Number(m[1]) : null;
+}

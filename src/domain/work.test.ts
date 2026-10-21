@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketTasks, daysSince, dueAtFromDay, isStale, istDay, taskBucket } from "./work";
+import { bucketTasks, daysSince, dueAtFromDay, isStale, istDay, salesmateDealNumber, taskBucket } from "./work";
 
 // 21 Oct 2026, 10:00 IST
 const now = new Date("2026-10-21T04:30:00Z");
@@ -43,5 +43,18 @@ describe("staleness", () => {
 describe("dueAtFromDay", () => {
   it("means end of the working day in IST", () => {
     expect(dueAtFromDay("2026-10-21").toISOString()).toBe("2026-10-21T12:30:00.000Z");
+  });
+});
+
+describe("salesmateDealNumber", () => {
+  it("reads a bare number or a Salesmate deal link", () => {
+    expect(salesmateDealNumber("14997")).toBe(14997);
+    expect(salesmateDealNumber(" #14997 ")).toBe(14997);
+    expect(salesmateDealNumber("https://limechat.salesmate.io/#/app/deals/14997/detail")).toBe(14997);
+  });
+  it("ignores ordinary text and phone numbers", () => {
+    expect(salesmateDealNumber("monsoon")).toBeNull();
+    expect(salesmateDealNumber("9876543210")).toBeNull();
+    expect(salesmateDealNumber("deals/14997")).toBeNull();
   });
 });

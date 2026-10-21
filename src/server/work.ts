@@ -3,7 +3,7 @@ import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { activities, contacts, deals, organizations, stages, users } from "@/db/schema";
-import { bucketTasks, daysSince, isStale } from "@/domain/work";
+import { bucketTasks, daysSince, isStale, salesmateDealNumber } from "@/domain/work";
 
 /** Open tasks (activities with no completion) for one person, or everyone. */
 async function openTasks(ownerId: string | null) {
@@ -74,9 +74,16 @@ export type MyWork = Awaited<ReturnType<typeof getMyWork>>;
 
 const SEARCH_LIMIT = 8;
 
+/** The LimeCRM deal a Salesmate deal (Sales, Onboarding or CS copy) was migrated into. */
+export async function dealForSalesmateId(n: number) {
+  const [d] = await db.select({ id: deals.id }).from(deals).where(sql`${n} = any(${deals.salesmateDealIds})`).limit(1);
+  return d?.id ?? null;
+}
+
 /** Header search: companies, deals and leads/contacts matching the text. */
 export async function searchAll(q: string) {
   const like = `%${q.trim()}%`;
+  const smId = salesmateDealNumber(q);
   const [orgs, dealRows, people] = await Promise.all([
     db
       .select({ id: organizations.id, name: organizations.name, lifecycle: organizations.lifecycle, mrr: organizations.contractedMrr, website: organizations.website })
@@ -89,8 +96,8 @@ export async function searchAll(q: string) {
       .from(deals)
       .innerJoin(stages, eq(stages.id, deals.stageId))
       .innerJoin(organizations, eq(organizations.id, deals.orgId))
-      .where(or(ilike(deals.title, like), ilike(organizations.name, like)))
-      .orderBy(desc(deals.updatedAt))
+      .where(or(ilike(deals.title, like), ilike(organizations.name, like), smId ? sql`${smId} = any(${deals.salesmateDealIds})` : undefined))
+      .orderBy(smId ? sql`${smId} = any(${deals.salesmateDealIds}) desc` : desc(deals.updatedAt), desc(deals.updatedAt))
       .limit(SEARCH_LIMIT),
     db
       .select({
