@@ -88,6 +88,8 @@ export type PlanDeal = Pick<
   ownerEmail: string | null;
   closedAt: string | null;
   createdAt: string | null;
+  /** Last change in Salesmate across the deal's clones, so staleness and hygiene start from the truth. */
+  modifiedAt: string | null;
   lineItems: PlanLineItem[];
   groupKey: string;
   confidence: string;

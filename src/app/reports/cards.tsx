@@ -1,10 +1,11 @@
-/** The five Reports v1 cards. Each loads its own data for its own range. */
-import { Badge, Grid, GridCol, Text } from "@mantine/core";
+/** The report cards. Each loads its own data for its own range. */
+import { Badge, Grid, GridCol, Stack, Text } from "@mantine/core";
 import { AnchorLink } from "@/components/links";
 import { Empty, HEALTH_COLOR } from "@/components/ui";
 import { LEAD_STATUS_LABEL, LEAD_STATUSES, type LeadStatus } from "@/domain/leads";
 import { CHURN_LABEL, DEAL_TYPE_LABEL, inr, LIFECYCLE_LABEL, SEGMENT_LABEL, shortDate } from "@/lib/format";
-import { getCustomerBook, getMrrBooked, getOnboardingThroughput, getPipeline, getSdrFunnel } from "@/server/reports";
+import { DEAL_CHECKS, LEAD_CHECKS } from "@/domain/hygiene";
+import { getCustomerBook, getHygiene, getMrrBooked, getOnboardingThroughput, getPipeline, getSdrFunnel } from "@/server/reports";
 import { DEAL_TYPES, HEALTHS, kickoffToHandover, NO_OWNER, weightedMrr, type BookedLine, type DealType } from "./aggregate";
 import { ReportBarChart, type ChartSeries } from "./charts";
 import { inRange, monthLabel, type DateRange } from "./range";
@@ -446,6 +447,110 @@ export async function OnboardingCard({ range }: { range: DateRange }) {
             </GridCol>
           </Grid>
         </>
+      )}
+    </ReportCard>
+  );
+}
+
+// ---------- 6. CRM hygiene ----------
+
+/** Score colour: green from 90%, yellow from 75%, red below. */
+const scoreColor = (n: number | null) => (n === null ? "gray" : n >= 0.9 ? "green" : n >= 0.75 ? "yellow" : "red");
+const ScoreBadge = ({ n }: { n: number | null }) => <Badge color={scoreColor(n)}>{pct(n)}</Badge>;
+/** The headline score: the number itself in the score colour. */
+const ScoreValue = ({ n }: { n: number | null }) => <Text inherit c={n === null ? "dimmed" : `${scoreColor(n)}.7`}>{pct(n)}</Text>;
+const share = (t: { passed: number; total: number }) => (t.total ? t.passed / t.total : null);
+const FIX_LIMIT = 30;
+
+export async function HygieneCard({ range }: { range: DateRange }) {
+  const r = await getHygiene(range);
+  type AeRow = (typeof r.ae.people)[number];
+  type SdrRow = (typeof r.sdr.people)[number];
+  const toFix = r.ae.team.failing.length + r.sdr.team.failing.length;
+  const fixList = (items: typeof r.ae.team.failing, base: string, personLabel: string) => (
+    <DataTable
+      rows={items.slice(0, FIX_LIMIT)}
+      rowKey={(f) => f.id}
+      empty="Nothing to fix"
+      columns={[
+        {
+          label: base === "deals" ? "Deal" : "Lead",
+          render: (f) => (
+            <AnchorLink href={`/${base}/${f.id}`} size="sm" fw={600}>
+              {f.title}
+            </AnchorLink>
+          ),
+          minWidth: 200,
+        },
+        { label: "Company", render: (f) => f.orgName ?? "—", minWidth: 140 },
+        { label: personLabel, render: (f) => f.person, minWidth: 120 },
+        { label: "To fix", render: (f) => <Text size="sm">{f.problems.join(" · ")}</Text>, minWidth: 260 },
+      ]}
+    />
+  );
+  return (
+    <ReportCard
+      id="hygiene"
+      title="CRM hygiene"
+      description={
+        <>
+          How complete and current each person&apos;s records are; 5% of AE variable pay depends on it. AEs: the current stage&apos;s required
+          fields, a close date that hasn&apos;t passed, a touch in the last 14 days, a next step and a primary contact. SDRs: the SOP fields for
+          the lead&apos;s status and a touch in the last 14 days.
+        </>
+      }
+      range={range}
+      rangeNote="open deals and leads as of now, plus those closed in the period"
+    >
+      <Kpis
+        items={[
+          { label: "AE hygiene", value: <ScoreValue n={r.ae.team.score} />, hint: plural(r.ae.team.records, "deal") },
+          { label: "SDR hygiene", value: <ScoreValue n={r.sdr.team.score} />, hint: plural(r.sdr.team.records, "lead") },
+          { label: "Deals to fix", value: count(r.ae.team.failing.length) },
+          { label: "Leads to fix", value: count(r.sdr.team.failing.length), hint: toFix ? undefined : "All clean" },
+        ]}
+      />
+      <DataTable<AeRow>
+        title="AEs"
+        rows={r.ae.people}
+        rowKey={(p) => p.personId ?? "none"}
+        total={r.ae.team}
+        empty="No deals to check"
+        columns={[
+          { label: "AE", render: (p) => p.name, minWidth: 140 },
+          { label: "Score", render: (p) => <ScoreBadge n={p.score} />, align: "right" },
+          { label: "Deals", render: (p) => count(p.records), align: "right" },
+          ...DEAL_CHECKS.map((c) => ({ label: c.label, render: (p: AeRow) => pct(share(p.byCheck[c.key])), align: "right" as const })),
+          { label: "To fix", render: (p) => count(p.failing.length), align: "right" },
+        ]}
+      />
+      <DataTable<SdrRow>
+        title="SDRs"
+        rows={r.sdr.people}
+        rowKey={(p) => p.personId ?? "none"}
+        total={r.sdr.team}
+        empty="No leads to check"
+        columns={[
+          { label: "SDR", render: (p) => p.name, minWidth: 140 },
+          { label: "Score", render: (p) => <ScoreBadge n={p.score} />, align: "right" },
+          { label: "Leads", render: (p) => count(p.records), align: "right" },
+          ...LEAD_CHECKS.map((c) => ({ label: c.label, render: (p: SdrRow) => pct(share(p.byCheck[c.key])), align: "right" as const })),
+          { label: "To fix", render: (p) => count(p.failing.length), align: "right" },
+        ]}
+      />
+      <Stack gap={6}>
+        <Text size="sm" fw={700}>
+          Deals to fix{r.ae.team.failing.length > FIX_LIMIT ? ` (the ${FIX_LIMIT} worst of ${count(r.ae.team.failing.length)}; the CSV has every AE)` : ""}
+        </Text>
+        {fixList(r.ae.team.failing, "deals", "AE")}
+      </Stack>
+      {r.sdr.team.failing.length > 0 && (
+        <Stack gap={6}>
+          <Text size="sm" fw={700}>
+            Leads to fix
+          </Text>
+          {fixList(r.sdr.team.failing, "leads", "SDR")}
+        </Stack>
       )}
     </ReportCard>
   );

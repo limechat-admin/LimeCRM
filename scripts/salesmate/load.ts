@@ -182,6 +182,7 @@ async function load(tx: Tx, plan: Plan, replace: boolean) {
         oneTimeFee: d.oneTimeFee,
         salesmateDealIds: d.salesmateDealIds,
         ...(d.createdAt ? { createdAt: new Date(d.createdAt) } : {}),
+        ...(d.modifiedAt ? { updatedAt: new Date(d.modifiedAt) } : {}),
       })),
     ),
   );

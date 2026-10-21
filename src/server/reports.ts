@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   churnSummary,
@@ -19,9 +19,11 @@ import {
 } from "@/app/reports/aggregate";
 import type { DateRange } from "@/app/reports/range";
 import { db } from "@/db";
-import { contacts, deals, onboardings, organizations, stages, users } from "@/db/schema";
+import { activities, contacts, dealLineItems, deals, onboardings, organizations, stages, users } from "@/db/schema";
+import { missingFields, requiredFieldsFor } from "@/domain/gates";
+import { DEAL_CHECKS, dealChecks, LEAD_CHECKS, leadChecks, scoreByPerson, type DealHygieneInput, type LeadHygieneInput } from "@/domain/hygiene";
 import { CHURN_LABEL, DEAL_TYPE_LABEL, LIFECYCLE_LABEL, SEGMENT_LABEL } from "@/lib/format";
-import { LEAD_STATUS_LABEL, type LeadStatus } from "@/domain/leads";
+import { isLeadStatus, LEAD_STATUS_LABEL, LEAD_STATUSES, leadStatusMissing, type LeadStatus } from "@/domain/leads";
 
 /** A timestamptz as the calendar day in India. */
 const istDay = (col: unknown) => sql<string>`to_char(${col} at time zone 'Asia/Kolkata', 'YYYY-MM-DD')`;
@@ -270,12 +272,149 @@ export async function getOnboardingThroughput(range: DateRange) {
   return { ...report, csv };
 }
 
+// ---------- 6. CRM hygiene ----------
+
+/**
+ * Hygiene as of now: every open deal, plus deals won or lost in the period, scored per AE; and
+ * every lead still being worked, plus leads closed in the period, scored per SDR.
+ */
+export async function getHygiene(range: DateRange) {
+  const now = new Date();
+  const owner = alias(users, "owner");
+  const sdr = alias(users, "sdr");
+  const closedInRange = sql`(${deals.closedAt} at time zone 'Asia/Kolkata')::date between ${range.from} and ${range.to}`;
+  const [salesStages, dealRows] = await Promise.all([
+    db.select().from(stages).where(eq(stages.pipeline, "sales")),
+    db
+      .select({ deal: deals, org: organizations, ownerName: owner.name })
+      .from(deals)
+      .innerJoin(organizations, eq(organizations.id, deals.orgId))
+      .leftJoin(owner, eq(owner.id, deals.ownerId))
+      .where(or(and(eq(deals.status, "open"), isNull(deals.endedAt)), and(inArray(deals.status, ["won", "lost"]), closedInRange))),
+  ]);
+  const dealIds = dealRows.map((r) => r.deal.id);
+  const [items, touches, openTasks] = dealIds.length
+    ? await Promise.all([
+        db.select().from(dealLineItems).where(inArray(dealLineItems.dealId, dealIds)),
+        db
+          .select({ dealId: activities.dealId, at: sql<Date>`max(greatest(${activities.createdAt}, coalesce(${activities.completedAt}, ${activities.createdAt})))` })
+          .from(activities)
+          .where(inArray(activities.dealId, dealIds))
+          .groupBy(activities.dealId),
+        db.selectDistinct({ dealId: activities.dealId }).from(activities).where(and(inArray(activities.dealId, dealIds), isNull(activities.completedAt))),
+      ])
+    : [[], [], []];
+  const itemsBy = new Map<string, typeof items>();
+  for (const i of items) itemsBy.set(i.dealId, [...(itemsBy.get(i.dealId) ?? []), i]);
+  const touchBy = new Map(touches.map((t) => [t.dealId, new Date(t.at)]));
+  const tasks = new Set(openTasks.map((t) => t.dealId));
+  const stageById = new Map(salesStages.map((st) => [st.id, st]));
+
+  const dealInputs: DealHygieneInput[] = dealRows.map(({ deal, org, ownerName }) => {
+    const stage = stageById.get(deal.stageId)!;
+    const activity = touchBy.get(deal.id);
+    return {
+      id: deal.id,
+      title: deal.title,
+      orgName: org.name,
+      ownerId: deal.ownerId,
+      ownerName,
+      status: deal.status,
+      stageMissing: missingFields({ deal, lineItems: itemsBy.get(deal.id) ?? [], org }, requiredFieldsFor(salesStages, stage)).map((m) => m.label),
+      expectedCloseDate: deal.expectedCloseDate,
+      primaryContactId: deal.primaryContactId,
+      lastTouchAt: activity && activity > deal.updatedAt ? activity : deal.updatedAt,
+      hasOpenTask: tasks.has(deal.id),
+    };
+  });
+  const dealKeys = DEAL_CHECKS.map((c) => c.key);
+  const ae = scoreByPerson(
+    dealInputs,
+    dealKeys,
+    (d) => ({ id: d.ownerId, name: d.ownerName }),
+    (d) => dealChecks(d, now),
+    (d) => ({ id: d.id, title: d.title, orgName: d.orgName }),
+  );
+
+  // Leads: being worked (open / on hold), or closed (won / lost status) and touched in the period.
+  const kindOf = Object.fromEntries(LEAD_STATUSES.map((st) => [st.key, st.kind])) as Record<string, string>;
+  const leadRows = await db
+    .select({ c: contacts, orgName: organizations.name, sdrName: sdr.name })
+    .from(contacts)
+    .leftJoin(organizations, eq(organizations.id, contacts.orgId))
+    .leftJoin(sdr, eq(sdr.id, contacts.sdrId))
+    .where(isNotNull(contacts.leadStatus));
+  const leadTouches = leadRows.length
+    ? await db
+        .select({ contactId: activities.contactId, at: sql<Date>`max(${activities.createdAt})` })
+        .from(activities)
+        .where(isNotNull(activities.contactId))
+        .groupBy(activities.contactId)
+    : [];
+  const leadTouchBy = new Map(leadTouches.map((t) => [t.contactId, new Date(t.at)]));
+  const inPeriod = (d: Date) => {
+    const day = new Date(d.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+    return day >= range.from && day <= range.to;
+  };
+  const leadInputs: LeadHygieneInput[] = leadRows
+    .filter(({ c }) => ["open", "hold"].includes(kindOf[c.leadStatus!]) || inPeriod(c.updatedAt))
+    .map(({ c, orgName, sdrName }) => {
+      const activity = leadTouchBy.get(c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        orgName,
+        sdrId: c.sdrId,
+        sdrName,
+        kind: kindOf[c.leadStatus!] ?? "open",
+        statusMissing: isLeadStatus(c.leadStatus) ? leadStatusMissing(c, c.leadStatus).map((m) => m.label) : [],
+        lastTouchAt: activity && activity > c.updatedAt ? activity : c.updatedAt,
+      };
+    });
+  const sdrScores = scoreByPerson(
+    leadInputs,
+    LEAD_CHECKS.map((c) => c.key),
+    (l) => ({ id: l.sdrId, name: l.sdrName }),
+    (l) => leadChecks(l, now),
+    (l) => ({ id: l.id, title: l.name, orgName: l.orgName }),
+  );
+
+  const pctCell = (n: number | null) => (n === null ? "" : Math.round(n * 100));
+  const csv: Csv = {
+    header: ["Role", "Person", "Score %", "Records", ...DEAL_CHECKS.map((c) => `${c.label} %`), ...LEAD_CHECKS.map((c) => `Lead ${c.label.toLowerCase()} %`), "Records to fix"],
+    rows: [
+      ...ae.people.map((p) => [
+        "AE",
+        p.name,
+        pctCell(p.score),
+        p.records,
+        ...DEAL_CHECKS.map((c) => pctCell(checkShare(p.byCheck[c.key]))),
+        ...LEAD_CHECKS.map(() => ""),
+        p.failing.length,
+      ]),
+      ...sdrScores.people.map((p) => [
+        "SDR",
+        p.name,
+        pctCell(p.score),
+        p.records,
+        ...DEAL_CHECKS.map(() => ""),
+        ...LEAD_CHECKS.map((c) => pctCell(checkShare(p.byCheck[c.key]))),
+        p.failing.length,
+      ]),
+    ],
+  };
+  return { ae, sdr: sdrScores, csv };
+}
+
+const checkShare = (t: { passed: number; total: number }) => (t.total ? t.passed / t.total : null);
+
 export const REPORTS = {
   mrr: { title: "MRR booked", load: getMrrBooked, fallback: "this_month" },
   pipeline: { title: "Pipeline and forecast", load: getPipeline, fallback: "this_month" },
   sdr: { title: "SDR funnel", load: getSdrFunnel, fallback: "this_month" },
   book: { title: "Customer book", load: getCustomerBook, fallback: "quarter" },
   onboarding: { title: "Onboarding throughput", load: getOnboardingThroughput, fallback: "quarter" },
+  hygiene: { title: "CRM hygiene", load: getHygiene, fallback: "this_month" },
 } as const;
 
 export type ReportKey = keyof typeof REPORTS;

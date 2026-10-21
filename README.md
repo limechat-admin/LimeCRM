@@ -11,6 +11,8 @@ LimeChat's in-house CRM, replacing Salesmate. **LimeCRM is the source of truth**
 
 **Reconnect** replaces Salesmate's Reconnect pipeline. A company that isn't buying yet gets a *reconnect on* date and a reason: set them on the company page with the 1, 3 or 6-month presets. **Reconnect** in the sidebar lists these companies, soonest first. On the day, the morning job opens a "Reconnect with …" task for the company's AE, so it shows up in My work and in the AE's digest. After the call, the AE sets the next date or takes the company off the list.
 
+**Bulk edit:** tick rows on Leads or Companies, then change several at once. Each record still goes through its normal update, so the change is audited, webhooks fire, and lead statuses still need their SOP fields. Leads that can't move are named in the result. **CRM hygiene** (Reports) scores each AE and SDR on the same rules the stage gates and the SOP use, with a list of records to fix.
+
 ## Run it locally
 
 ```bash

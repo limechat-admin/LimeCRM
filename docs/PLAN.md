@@ -223,9 +223,11 @@ Explicitly **not** building now: email sequences, dialer and call recording, con
   - **Outbound webhooks** (Settings → Webhooks), signed and retried.
   - **Drag and drop** on the Deals and Onboarding boards.
   - **Reconnect** as nurture dates with a list and daily AE tasks. The migration turns the Reconnect pipeline into these dates.
+  - **Bulk edit** on Leads (SDR, AE, status, with the SOP checks per lead) and Companies (AE with their open deals, OM, CSM, segment, reconnect). Companies gained filters.
+  - **CRM hygiene report** (the 5% of AE variable). AEs are scored on stage fields, close date, a touch in 14 days, a next step and a primary contact; SDRs on status fields and a touch in 14 days. The report has a fix list and a CSV. Imported deals keep Salesmate's last-modified date, so staleness is right from day one.
 - **Not done yet:**
   - Needs credentials: Google Calendar (Google OAuth app) · Chargebee link and booked-vs-billed recon (Chargebee API key) · Helpdesk link (Helpdesk API) · full Salesmate extract and cutover (rotated Salesmate token).
-  - Can be built without credentials: bulk edit on lists · hygiene score report · Metabase reporting schema.
+  - Can be built without credentials: Metabase reporting schema.
 
 | Phase | Weeks | Scope | Exit criteria |
 |---|---|---|---|

@@ -474,6 +474,12 @@ export function buildPlan(snap: Snapshot): Plan {
       oneTimeFee: totals.oneTimeFee,
       salesmateDealIds: sale.members.map((m) => m.id),
       createdAt: iso(head.createdAt),
+      modifiedAt: iso(
+        sale.members
+          .map((m) => m.modifiedAt)
+          .filter((d): d is Date => !!d)
+          .sort((a, b) => b.getTime() - a.getTime())[0],
+      ),
       lineItems: items,
       groupKey: sale.g.key,
       confidence: sale.g.confidence,
