@@ -21,6 +21,8 @@ import {
 import { Download, Search, Upload, Users, X } from "lucide-react";
 import type { Metadata } from "next";
 import { createLeadAction, deleteViewAction } from "@/app/actions";
+import { bulkLeadsAction } from "@/app/bulk-actions";
+import { BulkBar, BulkCheckbox, BulkHeaderCheckbox, BulkProvider } from "@/components/bulk-edit";
 import classes from "@/components/board.module.css";
 import { ActionForm, InlineAction, SubmitButton } from "@/components/forms";
 import { SaveViewButton } from "@/components/saved-views";
@@ -30,6 +32,7 @@ import { bantTotal, LEAD_STATUSES, type LeadStatus } from "@/domain/leads";
 import { shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
 import { listLeads, listUsers, listViews, type LeadFilters } from "@/server/queries";
+import { CLEAR } from "@/domain/bulk";
 import { canWrite } from "@/domain/permissions";
 import { cleanViewQuery, viewHref } from "@/domain/views";
 
@@ -49,9 +52,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const user = await getCurrentUser();
   const filters = await searchParams;
   const [{ rows, byStatus, pageSize }, people, views] = await Promise.all([listLeads(filters), listUsers(), listViews("leads", user.id)]);
-  const currentQuery = cleanViewQuery("leads", new URLSearchParams(Object.entries(filters).filter(([, v]) => typeof v === "string") as [string, string][]).toString());
+  const currentQuery = cleanViewQuery(
+    "leads",
+    new URLSearchParams(Object.entries(filters).filter(([, v]) => typeof v === "string") as [string, string][]).toString(),
+  );
   const userOptions = people.map((u) => ({ value: u.id, label: u.name }));
   const total = Object.values(byStatus).reduce((a, n) => a + n, 0);
+  const editable = canWrite(user.role).ok;
+  const bulkPeople = [{ value: CLEAR, label: "Nobody" }, ...userOptions];
   const working = ["not_contacted", "attempted_contact", "ongoing", "meeting_scheduled"].reduce((a, k) => a + (byStatus[k] ?? 0), 0);
 
   return (
@@ -61,7 +69,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         subtitle="People the SDRs are working, from first touch to qualified meeting and SQL."
         actions={
           <Group gap="xs">
-            <Button component="a" href={`/export/leads.csv${href(filters, {}).replace("/leads", "")}`} variant="default" size="xs" leftSection={<Download size={14} />}>
+            <Button
+              component="a"
+              href={`/export/leads.csv${href(filters, {}).replace("/leads", "")}`}
+              variant="default"
+              size="xs"
+              leftSection={<Download size={14} />}
+            >
               Export CSV
             </Button>
             <LinkButton href="/leads/import" size="xs" leftSection={<Upload size={14} />}>
@@ -135,12 +149,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 All {total}
               </LinkButton>
               {LEAD_STATUSES.map((s) => (
-                <LinkButton
-                  key={s.key}
-                  href={href(filters, { status: s.key })}
-                  size="xs"
-                  variant={filters.status === s.key ? "filled" : "default"}
-                >
+                <LinkButton key={s.key} href={href(filters, { status: s.key })} size="xs" variant={filters.status === s.key ? "filled" : "default"}>
                   {s.label} {byStatus[s.key] ?? 0}
                 </LinkButton>
               ))}
@@ -151,66 +160,90 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               )}
             </Group>
 
-            <Card withBorder p={0}>
-              {rows.length === 0 ? (
-                <Empty>No leads match these filters</Empty>
-              ) : (
-                <TableScrollContainer minWidth={820}>
-                  <Table highlightOnHover>
-                    <TableThead>
-                      <TableTr>
-                        <TableTh>Lead</TableTh>
-                        <TableTh>Company</TableTh>
-                        <TableTh miw={180}>Status</TableTh>
-                        <TableTh ta="right">BANT</TableTh>
-                        <TableTh>AE</TableTh>
-                        <TableTh>SDR</TableTh>
-                        <TableTh>Source</TableTh>
-                        <TableTh>Updated</TableTh>
-                      </TableTr>
-                    </TableThead>
-                    <TableTbody>
-                      {rows.map(({ c, orgName, ownerName, sdrName }) => {
-                        const status = c.leadStatus ? STATUS[c.leadStatus as LeadStatus] : undefined;
-                        return (
-                          <TableTr key={c.id}>
-                            <TableTd>
-                              <AnchorLink href={`/leads/${c.id}`} className={classes.rowLink} underline="never">
-                                {c.name}
-                              </AnchorLink>
-                              {c.designation && (
-                                <Text size="xs" c="dimmed">
-                                  {c.designation}
-                                </Text>
+            <BulkProvider allIds={rows.map((r) => r.c.id)}>
+              <Card withBorder p={0}>
+                {rows.length === 0 ? (
+                  <Empty>No leads match these filters</Empty>
+                ) : (
+                  <TableScrollContainer minWidth={820}>
+                    <Table highlightOnHover>
+                      <TableThead>
+                        <TableTr>
+                          {editable && (
+                            <TableTh w={36}>
+                              <BulkHeaderCheckbox />
+                            </TableTh>
+                          )}
+                          <TableTh>Lead</TableTh>
+                          <TableTh>Company</TableTh>
+                          <TableTh miw={180}>Status</TableTh>
+                          <TableTh ta="right">BANT</TableTh>
+                          <TableTh>AE</TableTh>
+                          <TableTh>SDR</TableTh>
+                          <TableTh>Source</TableTh>
+                          <TableTh>Updated</TableTh>
+                        </TableTr>
+                      </TableThead>
+                      <TableTbody>
+                        {rows.map(({ c, orgName, ownerName, sdrName }) => {
+                          const status = c.leadStatus ? STATUS[c.leadStatus as LeadStatus] : undefined;
+                          return (
+                            <TableTr key={c.id}>
+                              {editable && (
+                                <TableTd>
+                                  <BulkCheckbox id={c.id} label={c.name} />
+                                </TableTd>
                               )}
-                            </TableTd>
-                            <TableTd>
-                              {c.orgId ? (
-                                <AnchorLink href={`/companies/${c.orgId}`} size="sm" c="var(--mantine-color-text)">
-                                  {orgName}
+                              <TableTd>
+                                <AnchorLink href={`/leads/${c.id}`} className={classes.rowLink} underline="never">
+                                  {c.name}
                                 </AnchorLink>
-                              ) : (
-                                "—"
-                              )}
-                            </TableTd>
-                            <TableTd>
-                              {status ? <LeadStatusBadge kind={status.kind} label={status.label} /> : <Text c="dimmed">—</Text>}
-                            </TableTd>
-                            <TableTd ta="right" fw={600}>
-                              {bantTotal(c) ?? "—"}
-                            </TableTd>
-                            <TableTd>{ownerName ?? "—"}</TableTd>
-                            <TableTd>{sdrName ?? "—"}</TableTd>
-                            <TableTd c="dimmed">{c.source ?? "—"}</TableTd>
-                            <TableTd c="dimmed">{shortDate(c.updatedAt)}</TableTd>
-                          </TableTr>
-                        );
-                      })}
-                    </TableTbody>
-                  </Table>
-                </TableScrollContainer>
+                                {c.designation && (
+                                  <Text size="xs" c="dimmed">
+                                    {c.designation}
+                                  </Text>
+                                )}
+                              </TableTd>
+                              <TableTd>
+                                {c.orgId ? (
+                                  <AnchorLink href={`/companies/${c.orgId}`} size="sm" c="var(--mantine-color-text)">
+                                    {orgName}
+                                  </AnchorLink>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableTd>
+                              <TableTd>{status ? <LeadStatusBadge kind={status.kind} label={status.label} /> : <Text c="dimmed">—</Text>}</TableTd>
+                              <TableTd ta="right" fw={600}>
+                                {bantTotal(c) ?? "—"}
+                              </TableTd>
+                              <TableTd>{ownerName ?? "—"}</TableTd>
+                              <TableTd>{sdrName ?? "—"}</TableTd>
+                              <TableTd c="dimmed">{c.source ?? "—"}</TableTd>
+                              <TableTd c="dimmed">{shortDate(c.updatedAt)}</TableTd>
+                            </TableTr>
+                          );
+                        })}
+                      </TableTbody>
+                    </Table>
+                  </TableScrollContainer>
+                )}
+              </Card>
+              {editable && (
+                <BulkBar action={bulkLeadsAction} noun={rows.length === 1 ? "lead" : "leads"}>
+                  <Select
+                    name="status"
+                    label="Status"
+                    placeholder="Keep"
+                    clearable
+                    data={LEAD_STATUSES.map((s) => ({ value: s.key, label: s.label }))}
+                    w={180}
+                  />
+                  <Select name="sdrId" label="SDR" placeholder="Keep" clearable searchable data={bulkPeople} w={170} />
+                  <Select name="ownerId" label="AE" placeholder="Keep" clearable searchable data={bulkPeople} w={170} />
+                </BulkBar>
               )}
-            </Card>
+            </BulkProvider>
             {rows.length === pageSize && (
               <Text size="xs" c="dimmed">
                 Showing the {pageSize} most recently updated. Narrow the filters to find older leads.

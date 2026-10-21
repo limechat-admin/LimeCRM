@@ -75,6 +75,8 @@ export const limechatTheme = createTheme({
     // Badges never truncate ("ACT…"): they keep their full width and the column makes room.
     Badge: { defaultProps: { radius: "xs", variant: "light" }, styles: { root: { fontWeight: 600, letterSpacing: 0, flexShrink: 0, minWidth: "max-content" } } },
     Card: { defaultProps: { radius: "xs", shadow: "sm", padding: "md" } },
+    // Figma radius/2xs: square checkboxes (Mantine's default turns a 16px box into a circle).
+    Checkbox: { defaultProps: { radius: "xs" } },
     Paper: { defaultProps: { radius: "xs" } },
     Modal: { defaultProps: { radius: "sm", centered: true } },
     TextInput: { defaultProps: { radius: "xs" } },

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
@@ -8,6 +8,7 @@ import {
   dealLineItems,
   deals,
   events,
+  lifecycle,
   onboardings,
   organizations,
   savedViews,
@@ -68,10 +69,27 @@ export async function getDeal(id: string) {
   return { deal, org, lineItems, stages: salesStages, current, gates, contacts: orgContacts };
 }
 
-export async function listOrganizations() {
+export type OrgFilters = { q?: string; lifecycle?: string; aeId?: string };
+
+/**
+ * Companies, biggest contracted MRR first. With filters (search, lifecycle, AE or "none") for the
+ * list; without, every company (CSV export). `limit` caps the rows; `total` is the full match count.
+ */
+export async function listOrganizations(f: OrgFilters = {}, limit?: number) {
   const ae = alias(users, "ae");
   const csm = alias(users, "csm");
-  return db
+  const conds: SQL[] = [];
+  if (f.q?.trim()) {
+    const like = `%${f.q.trim()}%`;
+    conds.push(or(ilike(organizations.name, like), ilike(organizations.website, like))!);
+  }
+  if (f.lifecycle && (lifecycle.enumValues as readonly string[]).includes(f.lifecycle)) {
+    conds.push(eq(organizations.lifecycle, f.lifecycle as (typeof lifecycle.enumValues)[number]));
+  }
+  if (f.aeId === "none") conds.push(isNull(organizations.aeId));
+  else if (f.aeId && isUuid(f.aeId)) conds.push(eq(organizations.aeId, f.aeId));
+  const where = conds.length ? and(...conds) : undefined;
+  const query = db
     .select({
       id: organizations.id,
       name: organizations.name,
@@ -86,7 +104,11 @@ export async function listOrganizations() {
     .from(organizations)
     .leftJoin(ae, eq(ae.id, organizations.aeId))
     .leftJoin(csm, eq(csm.id, organizations.csmId))
+    .where(where)
     .orderBy(desc(organizations.contractedMrr), asc(organizations.name));
+  const rows = limit ? await query.limit(limit) : await query;
+  const [{ n }] = await db.select({ n: count() }).from(organizations).where(where);
+  return Object.assign(rows, { total: n });
 }
 
 export async function getOrganization(id: string) {
@@ -248,4 +270,20 @@ export async function recordTitle(kind: "deal" | "organization" | "lead", id: st
   if (kind === "deal") return (await db.select({ t: deals.title }).from(deals).where(eq(deals.id, id)))[0]?.t ?? null;
   if (kind === "organization") return (await db.select({ t: organizations.name }).from(organizations).where(eq(organizations.id, id)))[0]?.t ?? null;
   return (await db.select({ t: contacts.name }).from(contacts).where(eq(contacts.id, id)))[0]?.t ?? null;
+}
+
+/** Companies per lifecycle and the contracted MRR of current customers, for the Companies page tiles. */
+export async function organizationSummary() {
+  const rows = await db
+    .select({ lifecycle: organizations.lifecycle, n: count(), mrr: sql<number>`coalesce(sum(${organizations.contractedMrr}), 0)::float` })
+    .from(organizations)
+    .groupBy(organizations.lifecycle);
+  const by = (l: string) => rows.find((r) => r.lifecycle === l) ?? { n: 0, mrr: 0 };
+  const customerKinds = ["onboarding", "active", "on_hold"];
+  return {
+    customers: customerKinds.reduce((a, l) => a + by(l).n, 0),
+    bookMrr: customerKinds.reduce((a, l) => a + Number(by(l).mrr), 0),
+    active: by("active").n,
+    prospects: by("prospect").n,
+  };
 }
