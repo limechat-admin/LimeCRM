@@ -1,0 +1,142 @@
+# LimeCRM
+
+LimeChat's in-house CRM, replacing Salesmate. **LimeCRM is the source of truth** for deals, MRR, the active-client list and churn.
+
+- Plan: [docs/PLAN.md](docs/PLAN.md)
+- What we're replacing (reverse-engineered Salesmate spec): [docs/salesmate-inventory.md](docs/salesmate-inventory.md)
+
+## Model in one paragraph
+
+**Leads** (contacts with a lead status) are worked by SDRs with BANT scoring. Reaching Qualified Meeting or SQL opens the company's first deal automatically. One **Organization** per customer, with a lifecycle (Prospect → Onboarding → Active → On hold → Churned) and role-based owners (AE, OM, CSM). **Deals** move through the Sales pipeline only. Winning one is the handoff: it opens the organization's **Onboarding** record instead of cloning the deal into another pipeline. **MRR is computed** from deal line items (platform fee, seats, rate card, slabs), never typed. Every stage has a **gate** (required fields, carried forward through later stages) mirroring Salesmate's conditional-required rules, and the same gate applies in the UI and the API. Every change lands in an append-only **events** log, which powers the timelines.
+
+## Run it locally
+
+```bash
+pnpm install
+cp .env.example .env
+pnpm db:up          # Postgres 16 on 127.0.0.1:5444
+pnpm db:migrate
+pnpm db:seed        # stages + gates, dev admin, fictional demo data
+pnpm dev            # http://localhost:3000
+```
+
+`pnpm dev` runs as `DEV_USER_EMAIL` without signing in. Unset it to use Google sign-in locally (see below).
+
+## Sign-in and roles
+
+Google SSO via Auth.js v5, limited to the **limechat.ai** Google Workspace (verified email + Google's `hd` claim). Only people who already have an **active** row in `users` can sign in; nobody is auto-provisioned, because even read-only access exposes every customer's contract and MRR. Role and `is_active` are re-read from `users` on every request, so deactivating someone locks them out on their next click. Every route requires a session except `/api/v1` (bearer token), `/api/auth/*` and `/signin`.
+
+Set up the Google OAuth client once per environment:
+
+1. Google Cloud Console → APIs & Services → **OAuth consent screen**: User type **Internal** (limits it to the limechat.ai Workspace).
+2. **Credentials → Create credentials → OAuth client ID**, type **Web application**. Authorized redirect URI: `https://<host>/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for local testing).
+3. Put the client ID and secret in `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, and a random `AUTH_SECRET` (`openssl rand -base64 33`). Behind your own proxy, also set `AUTH_TRUST_HOST=true`.
+
+| Role | Can |
+|---|---|
+| viewer | Read everything, change nothing |
+| sales, onboarding | Edit deals, organizations, onboarding, activities |
+| cs | As above, plus mark an organization churned |
+| finance | As sales, plus edit pricing line items and contract fields on won deals, and move a deal out of Won |
+| admin | Everything |
+
+Won deals are the billing record, so their line items, contract fields (billing cycle, currency, contract start/renewal/link) and Won stage are Finance/Admin only. Rules live in `src/domain/permissions.ts`; server actions return the refusal as a form error.
+
+## Design
+
+LimeCRM uses the **LimeChat Design System V3** ([Figma](https://www.figma.com/design/Ncj0VUMigW7YqlpYcCB12G/LimeChat-Design-System---V3)) on **Mantine v9**, with the same theme as LimeNotes. The two apps should feel like one family.
+
+- **Tokens:** colours, type, spacing, radius and shadows come only from `src/theme/theme.ts`, which uses the same values as LimeNotes' `theme.ts`; keep the two in sync. Don't hard-code hex colours in components; use Mantine props, `var(--mantine-…)` or the extra `--lc-*` tokens in CSS modules.
+- **Typeface:** Lato, self-hosted in `src/theme/fonts`.
+- **Light and dark:** the scheme is stored in the `lc-color-scheme` cookie and rendered on the server, so there's no bootstrap script.
+- **Shell:** `src/components/app-frame.tsx` mirrors LimeNotes' AppFrame: the "LimeCRM / by LimeChat" lockup, a sidebar, a theme toggle and the user menu.
+- **Brand assets:** in `public/`.
+  - The LimeChat mark is for the header and favicon.
+  - The wordmark is for sign-in.
+  - Limey is only for empty states and sign-in, with one short plain line.
+- **Server components and Mantine:**
+  - Use flat exports (`GridCol`, `TableTr`, `TimelineItem`), not `Grid.Col` and friends.
+  - Never pass `component={Link}` from a server file; use `AnchorLink` or `ButtonLink` from `src/components/links.tsx`.
+
+## Scripts
+
+| | |
+|---|---|
+| `pnpm test` | Unit tests (MRR maths, stage gates, permissions) |
+| `pnpm typecheck` / `pnpm lint` | |
+| `pnpm db:generate --name <change>` | New migration after editing `src/db/schema.ts` |
+| `pnpm db:studio` | Browse the database |
+
+## API (v1) and MCP
+
+Internal apps (AccountPulse, the CS dashboard, the collections agent, the AI SDR) and Claude each get **their own API key**. An admin creates them under **Settings → API keys** (`/settings/api-keys`):
+
+- **Acts as** a LimeCRM user. Every call runs as that user, with the same role rules and stage gates as the UI: a viewer's key can't write, and only a Finance or Admin key can take a deal out of Won. Deactivating the user stops their keys.
+- **Access** is read only, or read and write (`write` includes `read`).
+- The key (`lcrm_…`) is shown **once**. LimeCRM stores only its sha256, the first few characters (so you can tell keys apart) and when it was last used. A lost key can't be recovered: revoke it and create another.
+
+Send it as `Authorization: Bearer lcrm_…`. Errors are `{ error }` with a 401 (no, unknown or revoked key), 403 (scope or role), 404, 400 or 422 (`{ error, missing: [{ key, label }] }` when a stage gate or lead requirement isn't met). Successes are `{ data }`.
+
+The old shared `LIMECRM_API_TOKEN` still works while it's set, so existing consumers keep running until they move to a key. It can read everything; its writes must name an active user in `actorEmail`. Unset it once nothing uses it. The MCP server doesn't accept it.
+
+### Money
+
+`mrr` is **monthly recurring revenue in the deal's `currency`** (INR for almost every deal; USD deals aren't converted). It's computed from the deal's line items and normalized to a month (an annual ₹1,20,000 item is ₹10,000 MRR); it can't be set through the API. One-time charges (implementation fees) are in `oneTimeFee`, never in MRR. An organization's `contractedMrr` is the MRR of its won deals whose contract hasn't ended, and 0 once churned. An open deal's MRR is pipeline, not revenue. Amounts are plain rupees, not lakhs.
+
+### REST
+
+| Method | Path | Scope | |
+|---|---|---|---|
+| GET | `/api/v1/organizations?lifecycle=active&q=acme` | read | Customer book with contracted MRR and owners. `q` matches name, website or a LimeChat account id |
+| GET | `/api/v1/organizations/:id` | read | Organization with deals, contacts, onboardings |
+| GET | `/api/v1/deals?stage=&status=&owner=&q=&orgId=&limit=100&offset=0` | read | Deals, most recently updated first, with `total`. `stage` is a Sales stage key, `status` is open/won/lost, `owner` is a user id, an email or `me` |
+| GET | `/api/v1/deals/:id` | read | Deal with organization, owner, line items and `stages`: each stage with the fields still `missing` to move there |
+| GET | `/api/v1/deals/:id/line-items` | read | Pricing, each item with its `monthlyValue`, plus the deal's `mrr`, `oneTimeFee` and `currency` |
+| POST | `/api/v1/deals/:id/transition` | write | `{ stage }`. 422 with `missing` if the gate isn't met |
+| GET | `/api/v1/leads?status=&owner=&sdr=&q=` | read | Leads (up to 100) with BANT total, plus `counts` per status |
+| GET | `/api/v1/leads/:id` | read | Lead with company and the company's deals |
+| POST | `/api/v1/leads/:id/status` | write | `{ status }`. 422 with `missing`; Qualified Meeting / SQL returns the `dealId` it opened or linked |
+| POST | `/api/v1/activities` | write | `{ type, subject, body?, orgId?, dealId?, contactId?, dueAt?, completedAt? }`. Logged as the key's user; 201 |
+
+```bash
+curl -s -H "Authorization: Bearer $LIMECRM_KEY" "http://localhost:3000/api/v1/deals?status=won&owner=me"
+```
+
+### MCP server
+
+`/api/v1/mcp` is a stateless [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) MCP server (official TypeScript SDK) that replaces the Salesmate MCP. It takes the same API keys. Tools: `search_deals`, `get_deal`, `update_deal_stage` (returns the `missing` gate fields when it refuses), `search_organizations`, `get_organization`, `search_leads`, `get_lead`, `set_lead_status`, `log_activity` and `list_users`. The write tools need a read-and-write key.
+
+For Claude Code, create a key for yourself and add this `.mcp.json` to your project (or `~/.claude.json`), with the key in your shell environment rather than in the file:
+
+```json
+{
+  "mcpServers": {
+    "limecrm": {
+      "type": "http",
+      "url": "https://<limecrm-host>/api/v1/mcp",
+      "headers": { "Authorization": "Bearer ${LIMECRM_API_KEY}" }
+    }
+  }
+}
+```
+
+Or from the command line: `claude mcp add --transport http limecrm https://<limecrm-host>/api/v1/mcp --header "Authorization: Bearer $LIMECRM_API_KEY"`.
+
+To try it with curl:
+
+```bash
+curl -s http://localhost:3000/api/v1/mcp \
+  -H "Authorization: Bearer $LIMECRM_API_KEY" \
+  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_deals","arguments":{"status":"won"}}}'
+```
+
+## Layout
+
+```
+src/db/          schema, client, seed
+src/domain/      pure logic: MRR maths, gates, stage config (unit-tested)
+src/server/      DB-bound services: transitions (handoffs), mutations, queries, auth
+src/app/         Next.js routes, server actions, /api/v1
+src/components/  UI
+```

@@ -1,0 +1,11 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>LimeChat</title>
+  <!-- Vector redraw of the LimeChat Design System "LimeChatLogoIConColor" mark (a raster in Figma). -->
+  <defs>
+    <linearGradient id="limechat-icon-fill" x1="2.5" y1="21.25" x2="21.25" y2="2.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6BAC1B"/>
+      <stop offset="1" stop-color="#A5C20E"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#limechat-icon-fill)" fill-rule="evenodd" d="M2.5 21.25V14.4A11.9 11.9 0 0 1 14.4 2.5H21.25V12.5A8.75 8.75 0 0 1 12.5 21.25H10.3V16.1H12.8A3.3 3.3 0 0 0 16.1 12.8V7.6H14.4A6.8 6.8 0 0 0 7.6 14.4V21.25Z"/>
+</svg>

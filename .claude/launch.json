@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "limecrm",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev", "--port", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "limecrm-signed-out",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DEV_USER_EMAIL=",
+        "AUTH_SECRET=local-preview-only-not-a-real-secret-0123456789",
+        "AUTH_GOOGLE_ID=placeholder.apps.googleusercontent.com",
+        "AUTH_GOOGLE_SECRET=placeholder",
+        "pnpm",
+        "dev",
+        "--port",
+        "3000"
+      ],
+      "port": 3000
+    }
+  ]
+}

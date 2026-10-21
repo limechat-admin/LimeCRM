@@ -1,0 +1,36 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Limey</title>
+  <defs>
+    <linearGradient id="limey-tile" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f2e12"/>
+      <stop offset="1" stop-color="#0f170a"/>
+    </linearGradient>
+    <radialGradient id="limey-body" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(106 112) rotate(50) scale(110)">
+      <stop stop-color="#d9f77f"/>
+      <stop offset="0.55" stop-color="#9fd544"/>
+      <stop offset="1" stop-color="#5f9e22"/>
+    </radialGradient>
+  </defs>
+  <!-- tile -->
+  <rect width="256" height="256" rx="58" fill="url(#limey-tile)"/>
+  <!-- leaf -->
+  <path d="M136 70 C140 44 164 32 188 36 C186 60 166 76 136 70 Z" fill="#3f9a2a"/>
+  <path d="M138 68 C150 56 164 48 182 40" stroke="#2c7419" stroke-width="3" stroke-linecap="round"/>
+  <!-- lime body -->
+  <circle cx="128" cy="142" r="76" fill="url(#limey-body)" stroke="#3f7d16" stroke-width="6"/>
+  <ellipse cx="98" cy="104" rx="20" ry="11" transform="rotate(-30 98 104)" fill="#ffffff" fill-opacity="0.35"/>
+  <!-- headphones: band + ear cups (Limey listens) -->
+  <path d="M54 136 C54 52 202 52 202 136" stroke="#2a2d34" stroke-width="13" stroke-linecap="round"/>
+  <rect x="38" y="118" width="30" height="50" rx="13" fill="#2a2d34"/>
+  <rect x="188" y="118" width="30" height="50" rx="13" fill="#2a2d34"/>
+  <rect x="46" y="128" width="14" height="30" rx="7" fill="#a6d84a"/>
+  <rect x="196" y="128" width="14" height="30" rx="7" fill="#a6d84a"/>
+  <!-- face -->
+  <circle cx="106" cy="138" r="10" fill="#17240b"/>
+  <circle cx="150" cy="138" r="10" fill="#17240b"/>
+  <circle cx="109" cy="134" r="3.5" fill="#ffffff"/>
+  <circle cx="153" cy="134" r="3.5" fill="#ffffff"/>
+  <ellipse cx="90" cy="162" rx="10" ry="6" fill="#f08a8a" fill-opacity="0.55"/>
+  <ellipse cx="166" cy="162" rx="10" ry="6" fill="#f08a8a" fill-opacity="0.55"/>
+  <path d="M112 164 Q128 180 144 164" stroke="#17240b" stroke-width="7" stroke-linecap="round" fill="none"/>
+</svg>

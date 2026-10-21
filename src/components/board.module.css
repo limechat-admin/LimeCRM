@@ -1,0 +1,65 @@
+/* Kanban boards (deals, onboarding). Colours come only from theme tokens. */
+.scroller {
+  overflow-x: auto;
+  padding-bottom: var(--mantine-spacing-md);
+  margin-inline: calc(var(--mantine-spacing-lg) * -1);
+  padding-inline: var(--mantine-spacing-lg);
+}
+
+.columns {
+  display: flex;
+  gap: var(--mantine-spacing-sm);
+  align-items: flex-start;
+}
+
+.column {
+  width: 264px;
+  flex-shrink: 0;
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-xs);
+  padding: var(--mantine-spacing-xs);
+}
+
+.columnWon {
+  border-top: 3px solid var(--mantine-color-green-6);
+}
+
+.columnLost {
+  border-top: 3px solid var(--mantine-color-red-6);
+}
+
+.columnOpen {
+  border-top: 3px solid var(--mantine-primary-color-filled);
+}
+
+.columnHold {
+  border-top: 3px solid var(--mantine-color-yellow-6);
+}
+
+.card {
+  display: block;
+  padding: var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-xs);
+  background: var(--mantine-color-body);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.card:hover {
+  background: var(--lc-primary-light);
+  border-color: var(--mantine-primary-color-filled);
+}
+
+/* clickable table rows */
+.rowLink {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.rowLink:hover {
+  color: var(--mantine-primary-color-filled);
+}

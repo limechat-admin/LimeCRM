@@ -1,0 +1,33 @@
+/* Chart series colours for Reports. Categorical order is fixed (series 1 is always lime) and was
+   checked for lightness, colour-blind separation and contrast against each scheme's surface.
+   Dark mode uses darker lime and orange steps so they sit inside the dark lightness band. */
+.chart {
+  --rc-1: var(--mantine-color-lime-6);
+  --rc-2: var(--mantine-color-blue-6);
+  --rc-3: var(--mantine-color-orange-6);
+  --rc-4: var(--mantine-color-violet-6);
+  --rc-5: var(--mantine-color-cyan-7);
+  --rc-neutral: var(--mantine-color-gray-4);
+
+  @mixin dark {
+    --rc-1: var(--mantine-color-lime-7);
+    --rc-3: var(--mantine-color-orange-8);
+    --rc-neutral: var(--mantine-color-dark-3);
+  }
+}
+
+.kpi {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-xs);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  background: var(--lc-surface-muted);
+}
+
+.totalRow td {
+  font-weight: 700;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.anchorTarget {
+  scroll-margin-top: 76px;
+}

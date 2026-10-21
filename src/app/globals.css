@@ -1,0 +1,6 @@
+/* Global styles come from Mantine and the LimeChat theme (src/theme). Keep this file nearly empty:
+   colours, type and spacing belong in theme.ts, and component styles in CSS modules. */
+html,
+body {
+  min-height: 100%;
+}
