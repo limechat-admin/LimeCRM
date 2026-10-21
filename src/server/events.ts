@@ -1,5 +1,6 @@
 import type { Tx } from "@/db";
 import { events } from "@/db/schema";
+import { enqueueWebhooks } from "./webhooks";
 
 export type EntityType = "organization" | "deal" | "onboarding" | "contact";
 
@@ -8,6 +9,8 @@ export async function recordEvent(
   e: { entityType: EntityType; entityId: string; orgId: string | null; actorId: string | null; action: string; data?: Record<string, unknown> },
 ) {
   await tx.insert(events).values({ ...e, data: e.data ?? {} });
+  // Same transaction: a webhook goes out exactly when the change commits.
+  await enqueueWebhooks(tx, e);
 }
 
 /** Field-level diff for "Updates" timelines. Only keys present in `patch` are compared. */

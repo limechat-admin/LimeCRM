@@ -418,3 +418,42 @@ export const notifications = pgTable(
 );
 
 export type Notification = typeof notifications.$inferSelect;
+
+/**
+ * Outbound webhooks (Settings → Webhooks). Every audit-log entry that maps to a published event
+ * (src/domain/webhooks.ts) becomes one delivery per subscribed endpoint, sent and retried like the
+ * Slack outbox. The secret signs each delivery; consumers verify it.
+ */
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  // Event keys, or ["*"] for everything.
+  events: text("events").array().notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamps.createdAt,
+});
+
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    endpointId: uuid("endpoint_id")
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: notificationStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    responseStatus: integer("response_status"),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("webhook_deliveries_due_idx").on(t.status, t.nextAttemptAt), index("webhook_deliveries_endpoint_idx").on(t.endpointId, t.createdAt)],
+);

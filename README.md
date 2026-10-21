@@ -160,6 +160,33 @@ curl -s http://localhost:3000/api/v1/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_deals","arguments":{"status":"won"}}}'
 ```
 
+### Webhooks
+
+Admins add endpoints under **Settings → Webhooks** (`/settings/webhooks`), so internal apps hear about changes as they happen instead of polling. Each endpoint picks its events, or all of them:
+
+`deal.created` · `deal.updated` · `deal.stage_changed` (includes won and lost) · `deal.pricing_changed` · `organization.created` · `organization.updated` · `organization.lifecycle_changed` · `organization.churned` · `onboarding.created` · `onboarding.updated` · `onboarding.stage_changed` · `lead.created` · `lead.updated` · `lead.status_changed`
+
+LimeCRM POSTs JSON like this:
+
+```json
+{
+  "id": "6f1c…",
+  "event": "deal.stage_changed",
+  "occurredAt": "2026-10-22T10:15:00.000Z",
+  "data": { "entityType": "deal", "id": "…", "orgId": "…", "actorId": "…", "changes": { "from": "Invoice Raised", "to": "Won · Handed over" } },
+  "links": { "api": "https://<host>/api/v1/deals/…", "app": "https://<host>/deals/…" }
+}
+```
+
+The payload is deliberately thin. Fetch the full record from `links.api` with the app's API key.
+
+- **Signature.** `X-LimeCRM-Signature: t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256 of `<t>.<raw body>` keyed with the endpoint's secret. The secret is shown once, when the endpoint is created. Reject a request if the signature doesn't match or `t` is more than 5 minutes old. `verifySignature` in `src/domain/webhooks.ts` is the reference implementation.
+- **Delivery.** Each change is queued in the same transaction as the change itself, and sent right after the request.
+- **Retries.** A non-2xx answer or a timeout (10 seconds) is retried with backoff for about 5 hours by the dispatch cron. A 4xx other than 408 or 429 isn't retried.
+- **Duplicates.** The same delivery can arrive twice, so de-duplicate on `id`.
+- **Pausing.** Pausing an endpoint skips its deliveries. **Send test** sends a `ping`.
+- **Imports.** Imports (Salesmate migration) don't fire webhooks.
+
 ## Layout
 
 ```

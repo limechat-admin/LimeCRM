@@ -185,7 +185,7 @@ export async function dispatchPending(limit = 50) {
   const due = await db
     .select({ id: notifications.id })
     .from(notifications)
-    .where(and(eq(notifications.status, "pending"), lte(notifications.nextAttemptAt, new Date())))
+    .where(and(eq(notifications.status, "pending"), lte(notifications.nextAttemptAt, sql`now()`)))
     .orderBy(asc(notifications.createdAt))
     .limit(limit);
   const results = { sent: 0, skipped: 0, failed: 0 };
