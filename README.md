@@ -9,6 +9,8 @@ LimeChat's in-house CRM, replacing Salesmate. **LimeCRM is the source of truth**
 
 **Leads** (contacts with a lead status) are worked by SDRs with BANT scoring. Reaching Qualified Meeting or SQL opens the company's first deal automatically. One **Organization** per customer, with a lifecycle (Prospect → Onboarding → Active → On hold → Churned) and role-based owners (AE, OM, CSM). **Deals** move through the Sales pipeline only. Winning one is the handoff: it opens the organization's **Onboarding** record instead of cloning the deal into another pipeline. **MRR is computed** from deal line items (platform fee, seats, rate card, slabs), never typed. Every stage has a **gate** (required fields, carried forward through later stages) mirroring Salesmate's conditional-required rules, and the same gate applies in the UI and the API. Every change lands in an append-only **events** log, which powers the timelines.
 
+**Reconnect** replaces Salesmate's Reconnect pipeline. A company that isn't buying yet gets a *reconnect on* date and a reason: set them on the company page with the 1, 3 or 6-month presets. **Reconnect** in the sidebar lists these companies, soonest first. On the day, the morning job opens a "Reconnect with …" task for the company's AE, so it shows up in My work and in the AE's digest. After the call, the AE sets the next date or takes the company off the list.
+
 ## Run it locally
 
 ```bash

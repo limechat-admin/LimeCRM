@@ -125,6 +125,16 @@ export type Flag = {
   detail: string;
 };
 
+/** A Reconnect-pipeline deal, which becomes a reconnect date on its company (matched by name, or a new prospect). */
+export type PlanReconnect = {
+  salesmateDealId: number;
+  companyName: string;
+  salesmateCompanyId: number | null;
+  aeEmail: string | null;
+  reconnectOn: string;
+  reason: string;
+};
+
 export type Plan = {
   snapshot: string;
   generatedAt: string;
@@ -134,6 +144,7 @@ export type Plan = {
   deals: PlanDeal[];
   onboardings: PlanOnboarding[];
   activities: PlanActivity[];
+  reconnects: PlanReconnect[];
   baseline: BaselineRow[];
   flags: Flag[];
   stats: Record<string, number>;

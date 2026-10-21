@@ -11,6 +11,7 @@
  * `created` event with data.via = "salesmate_import", which is how --replace finds them.
  */
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
@@ -245,6 +246,8 @@ async function load(tx: Tx, plan: Plan, replace: boolean) {
   // Contracted MRR via the app's own rollup.
   for (const o of plan.orgs) await recomputeOrg(tx, o.id);
 
+  await applyReconnects(tx, plan, uid);
+
   const ids = plan.orgs.map((o) => o.id);
   const active: ActiveOrgRow[] = [];
   await chunked(ids, 1000, async (c) => {
@@ -256,6 +259,53 @@ async function load(tx: Tx, plan: Plan, replace: boolean) {
     active.push(...rows.map((r) => ({ orgId: r.orgId, name: r.name, segment: r.segment ?? "(none)", csm: r.csm ?? "(none)", mrr: Number(r.mrr) })));
   });
   return active;
+}
+
+/**
+ * Reconnect-pipeline deals become reconnect dates. A company matched by name gets the date if it's
+ * a prospect or churned (customers are skipped: their Reconnect entry is a stale clone). Unmatched
+ * names become new prospects, marked as imported so --replace removes them.
+ */
+async function applyReconnects(tx: Tx, plan: Plan, uid: (email: string | null) => string | null) {
+  const list = plan.reconnects ?? [];
+  if (!list.length) return;
+  // One entry per company: the soonest date wins.
+  const byName = new Map<string, (typeof list)[number]>();
+  for (const r of list) {
+    const key = r.companyName.toLowerCase();
+    const prev = byName.get(key);
+    if (!prev || r.reconnectOn < prev.reconnectOn) byName.set(key, r);
+  }
+  const existing = await tx
+    .select({ id: organizations.id, name: organizations.name, lifecycle: organizations.lifecycle, aeId: organizations.aeId })
+    .from(organizations);
+  const orgByName = new Map(existing.map((o) => [o.name.toLowerCase(), o]));
+  const counts = { matched: 0, created: 0, skippedCustomers: 0 };
+  const created: (typeof organizations.$inferInsert & { id: string })[] = [];
+  for (const [key, r] of byName) {
+    const org = orgByName.get(key);
+    if (org) {
+      if (org.lifecycle !== "prospect" && org.lifecycle !== "churned") {
+        counts.skippedCustomers++;
+        continue;
+      }
+      await tx
+        .update(organizations)
+        .set({ reconnectOn: r.reconnectOn, reconnectReason: r.reason, aeId: org.aeId ?? uid(r.aeEmail) })
+        .where(eq(organizations.id, org.id));
+      counts.matched++;
+    } else {
+      created.push({ id: randomUUID(), name: r.companyName, aeId: uid(r.aeEmail), reconnectOn: r.reconnectOn, reconnectReason: r.reason, salesmateCompanyId: r.salesmateCompanyId });
+    }
+  }
+  await chunked(created, 500, (c) => tx.insert(organizations).values(c));
+  await chunked(created, 1000, (c) =>
+    tx.insert(events).values(c.map((o) => ({ entityType: "organization", entityId: o.id, orgId: o.id, action: "created", data: { via: VIA, name: o.name, reconnect: true } }))),
+  );
+  counts.created = created.length;
+  console.log(
+    `reconnect: ${list.length} Salesmate deals → ${byName.size} companies (${counts.matched} existing, ${counts.created} new prospects, ${counts.skippedCustomers} customers skipped)`,
+  );
 }
 
 async function main() {

@@ -14,6 +14,8 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { dealTotals } from "@/domain/mrr";
+import { addMonths, fromSalesmateStage } from "@/domain/reconnect";
+import { istDay } from "@/domain/work";
 import { collapseClones, type SaleGroup } from "./collapse";
 import type { DealField } from "./fields";
 import { day, list, num, str } from "./lib/raw";
@@ -35,7 +37,7 @@ import {
   type Segment,
 } from "./mapping";
 import { loadSnapshot, type SmDeal, type Snapshot } from "./normalize";
-import type { BaselineRow, Flag, Plan, PlanActivity, PlanContact, PlanDeal, PlanLineItem, PlanOnboarding, PlanOrg, PlanUser } from "./plan";
+import type { BaselineRow, Flag, Plan, PlanActivity, PlanContact, PlanDeal, PlanLineItem, PlanOnboarding, PlanOrg, PlanReconnect, PlanUser } from "./plan";
 import { reconciliationMarkdown } from "./report";
 
 /** MRR above this (₹/month) is almost certainly a data-entry error (e.g. TCV typed into Value). */
@@ -575,6 +577,27 @@ export function buildPlan(snap: Snapshot): Plan {
     });
   }
 
+  // ---------- reconnect (nurture list, not deals) ----------
+  // Due N months after the deal was last touched in Salesmate (so long-ignored ones come due now),
+  // or after the snapshot when Salesmate didn't say. Unknown stages are flagged, not guessed.
+  const reconnects: PlanReconnect[] = [];
+  for (const d of snap.deals.filter((x) => x.pipeline === "reconnect")) {
+    const rule = fromSalesmateStage(d.stage);
+    const companyName = (d.companyName ?? d.title).trim();
+    if (!rule || !companyName) {
+      flags.push({ kind: "reconnect_skipped", severity: "info", groupKey: null, org: companyName || null, salesmateDealIds: [d.id], detail: `Reconnect deal at stage "${d.stage}" not imported` });
+      continue;
+    }
+    reconnects.push({
+      salesmateDealId: d.id,
+      companyName,
+      salesmateCompanyId: d.companyId,
+      aeEmail: emailFor(d.ownerId, "sales"),
+      reconnectOn: addMonths(istDay(d.modifiedAt ?? d.createdAt ?? now), rule.months),
+      reason: d.title !== companyName ? `${rule.reason} · ${d.title}` : rule.reason,
+    });
+  }
+
   // ---------- users ----------
   const users: PlanUser[] = [];
   const seen = new Set<string>();
@@ -631,6 +654,7 @@ export function buildPlan(snap: Snapshot): Plan {
     deals,
     onboardings,
     activities,
+    reconnects,
     baseline,
     flags,
     stats,

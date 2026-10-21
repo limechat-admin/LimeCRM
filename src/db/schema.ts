@@ -133,6 +133,9 @@ export const organizations = pgTable(
     churnCategory: churnCategory("churn_category"),
     churnReason: text("churn_reason"),
     churnLastBillingDate: date("churn_last_billing_date"),
+    // Nurture (Salesmate's Reconnect pipeline): get back in touch on this day. The daily job opens a task for the AE.
+    reconnectOn: date("reconnect_on"),
+    reconnectReason: text("reconnect_reason"),
     salesmateCompanyId: integer("salesmate_company_id"),
     ...timestamps,
   },

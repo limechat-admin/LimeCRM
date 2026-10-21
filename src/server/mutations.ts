@@ -42,7 +42,7 @@ export async function updateDeal(id: string, patch: DealPatch, actorId: string) 
 type OrgPatch = Partial<
   Pick<
     typeof organizations.$inferInsert,
-    "name" | "website" | "segment" | "industry" | "hqCity" | "aeId" | "omId" | "csmId" | "lcAccountIds" | "chargebeeCustomerId" | "clientChannel" | "health" | "healthNote"
+    "name" | "website" | "segment" | "industry" | "hqCity" | "aeId" | "omId" | "csmId" | "lcAccountIds" | "chargebeeCustomerId" | "clientChannel" | "health" | "healthNote" | "reconnectOn" | "reconnectReason"
   >
 >;
 

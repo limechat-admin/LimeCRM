@@ -19,7 +19,7 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure, useHotkeys } from "@mantine/hooks";
-import { BellRing, Building2, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, Sun, UserRoundSearch, Webhook } from "lucide-react";
+import { BellRing, Building2, CalendarClock, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, Sun, UserRoundSearch, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, type ReactNode } from "react";
@@ -32,6 +32,7 @@ const NAV = [
   { href: "/deals", label: "Deals", icon: Handshake },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/onboarding", label: "Onboarding", icon: Rocket },
+  { href: "/reconnect", label: "Reconnect", icon: CalendarClock },
   { href: "/reports", label: "Reports", icon: ChartColumn },
 ];
 

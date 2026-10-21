@@ -228,6 +228,23 @@ export async function saveOrganizationAction(_: ActionState, fd: FormData): Prom
   return { ok: true, message: "Saved" };
 }
 
+const reconnectSchema = z.object({ orgId: z.string().uuid(), reconnectOn: text, reconnectReason: text, clear: text });
+
+/** Set (or, with an empty date, clear) when to get back in touch with a company. */
+export async function setReconnectAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getCurrentUser();
+  const denial = denied(canWrite(user.role));
+  if (denial) return denial;
+  const data = parse(reconnectSchema, fd);
+  if (isFailure(data)) return data;
+  const { orgId, reconnectReason } = data as z.infer<typeof reconnectSchema>;
+  const reconnectOn = fd.get("clear") ? null : (data as z.infer<typeof reconnectSchema>).reconnectOn;
+  if (reconnectOn && !/^\d{4}-\d{2}-\d{2}$/.test(reconnectOn)) return { ok: false, message: "Pick a date" };
+  await updateOrganization(orgId, { reconnectOn, reconnectReason: reconnectOn ? reconnectReason : null }, user.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: reconnectOn ? "Reconnect date saved" : "Taken off the reconnect list" };
+}
+
 const churnSchema = z.object({
   orgId: z.string().uuid(),
   churnedAt: requiredText,

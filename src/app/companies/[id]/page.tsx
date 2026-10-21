@@ -33,6 +33,7 @@ import { CHURN_LABEL, DEAL_TYPE_LABEL, initials, inr, LIFECYCLE_LABEL, options, 
 import { getCurrentUser } from "@/server/auth";
 import { getOrganization, getTimeline, listUsers, recordTitle } from "@/server/queries";
 import { DateField } from "@/components/date-field";
+import { ReconnectForm } from "@/components/reconnect-form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return { title: (await recordTitle("organization", (await params).id)) ?? "Not found" };
@@ -275,6 +276,12 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
                   </ActionForm>
                 </Section>
               )
+            )}
+
+            {(org.reconnectOn || org.lifecycle === "prospect" || org.lifecycle === "churned") && (
+              <Section title={org.reconnectOn ? `Reconnect ${shortDate(org.reconnectOn)}` : "Reconnect later"}>
+                <ReconnectForm orgId={org.id} on={org.reconnectOn} reason={org.reconnectReason} aeName={org.aeId ? name(org.aeId) : null} />
+              </Section>
             )}
 
             <Section title="History">
