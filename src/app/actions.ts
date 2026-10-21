@@ -37,6 +37,7 @@ import { dueAtFromDay } from "@/domain/work";
 import { MAX_IMPORT_ROWS } from "@/domain/csv";
 import { cleanViewQuery, isViewModule, VIEW_MODULES } from "@/domain/views";
 import { importLeads, type ImportSummary } from "@/server/import";
+import { dispatchPending } from "@/server/notify";
 import { createLead, setLeadStatus, updateLead } from "@/server/leads";
 import { churnOrganization, transitionDeal, transitionOnboarding } from "@/server/transitions";
 
@@ -452,4 +453,14 @@ export async function deleteViewAction(_: ActionState, fd: FormData): Promise<Ac
   const done = await deleteView(String(fd.get("viewId")), user);
   revalidatePath("/", "layout");
   return done ? { ok: true } : { ok: false, message: "Only the person who saved a view can delete it" };
+}
+
+// ---------- notifications ----------
+
+export async function sendPendingNotificationsAction(): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (user.role !== "admin") return { ok: false, message: "Only admins can do this" };
+  const r = await dispatchPending(200);
+  revalidatePath("/settings/notifications");
+  return { ok: true, message: `Sent ${r.sent}, skipped ${r.skipped}, failed ${r.failed}` };
 }

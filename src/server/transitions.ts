@@ -4,6 +4,14 @@ import { dealLineItems, deals, onboardings, organizations, stages, type Stage } 
 import { missingFields, requiredFieldsFor, type MissingField } from "@/domain/gates";
 import { recordEvent } from "./events";
 import { recomputeOrg } from "./mrr";
+import { kickDispatch, queueChurned, queueDealOutcome, queueHandedToCs } from "./notify";
+
+/** After a transition commits, try to send its Slack notifications straight away. */
+async function thenNotify(res: Promise<TransitionResult>) {
+  const r = await res;
+  if (r.ok) kickDispatch();
+  return r;
+}
 
 export type TransitionResult = { ok: true } | { ok: false; missing: MissingField[]; error?: string };
 
@@ -19,7 +27,7 @@ const statusFor = (kind: Stage["kind"]) => (kind === "won" ? "won" : kind === "l
  * (instead of cloning the deal into another pipeline) and advances the lifecycle.
  */
 export async function transitionDeal(dealId: string, stageKey: string, actorId: string): Promise<TransitionResult> {
-  return db.transaction(async (tx) => {
+  return thenNotify(db.transaction(async (tx) => {
     const [deal] = await tx.select().from(deals).where(eq(deals.id, dealId));
     if (!deal) return { ok: false, missing: [], error: "Deal not found" };
     const [org] = await tx.select().from(organizations).where(eq(organizations.id, deal.orgId));
@@ -49,8 +57,9 @@ export async function transitionDeal(dealId: string, stageKey: string, actorId: 
 
     if (status === "won") await onDealWon(tx, deal, org, actorId);
     await recomputeOrg(tx, org.id);
+    if (status !== "open") await queueDealOutcome(tx, dealId, status);
     return { ok: true };
-  });
+  }));
 }
 
 async function onDealWon(
@@ -111,7 +120,7 @@ async function setLifecycle(
 
 /** Move an onboarding through its stages. Handing to CS completes it and makes the organization Active. */
 export async function transitionOnboarding(onboardingId: string, stageKey: string, actorId: string): Promise<TransitionResult> {
-  return db.transaction(async (tx) => {
+  return thenNotify(db.transaction(async (tx) => {
     const [onb] = await tx.select().from(onboardings).where(eq(onboardings.id, onboardingId));
     if (!onb) return { ok: false, missing: [], error: "Onboarding not found" };
     if (onb.completedAt) return { ok: false, missing: [], error: "Onboarding is already complete" };
@@ -141,8 +150,9 @@ export async function transitionOnboarding(onboardingId: string, stageKey: strin
     if (target.kind === "won") await setLifecycle(tx, org, "active", actorId);
     else if (target.kind === "hold") await setLifecycle(tx, org, "on_hold", actorId);
     else if (org.lifecycle === "on_hold") await setLifecycle(tx, org, "onboarding", actorId);
+    if (target.kind === "won") await queueHandedToCs(tx, onboardingId);
     return { ok: true };
-  });
+  }));
 }
 
 export type ChurnInput = {
@@ -159,7 +169,7 @@ export async function churnOrganization(orgId: string, input: ChurnInput, actorI
   if (!input.lastBillingDate) missing.push({ key: "org.churn_last_billing_date", label: "Last billing date" });
   if (missing.length) return { ok: false, missing };
 
-  return db.transaction(async (tx) => {
+  return thenNotify(db.transaction(async (tx) => {
     const [org] = await tx.select().from(organizations).where(eq(organizations.id, orgId));
     if (!org) return { ok: false, missing: [], error: "Organization not found" };
     await tx
@@ -189,6 +199,7 @@ export async function churnOrganization(orgId: string, input: ChurnInput, actorI
       data: { category: input.category, reason: input.reason, lastBillingDate: input.lastBillingDate },
     });
     await recomputeOrg(tx, orgId);
+    await queueChurned(tx, orgId, org.contractedMrr);
     return { ok: true };
-  });
+  }));
 }

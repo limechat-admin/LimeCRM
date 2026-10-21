@@ -1,0 +1,24 @@
+# LimeCRM Slack app. Create it at https://api.slack.com/apps → Create New App → From a manifest,
+# pick the LimeChat workspace and paste this file. Then Install to Workspace and copy the
+# "Bot User OAuth Token" (xoxb-…) into SLACK_BOT_TOKEN.
+display_information:
+  name: LimeCRM
+  description: Deal wins, handovers, churn alerts and daily reminders from LimeCRM.
+  background_color: "#3c492c"
+features:
+  bot_user:
+    display_name: LimeCRM
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write          # post wins, losses, handovers, alerts and morning DMs
+      - chat:write.public   # post in public channels without being invited first
+      - channels:read       # find an existing client-o channel by name
+      - channels:manage     # create client-o-<company> channels and invite people
+      - users:read          # required alongside users:read.email
+      - users:read.email    # match LimeCRM users to Slack people by work email
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

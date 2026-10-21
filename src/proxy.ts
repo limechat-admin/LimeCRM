@@ -22,9 +22,9 @@ export function proxy(req: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  // Everything except: /api/v1 (bearer token, src/server/api.ts), Auth.js's own routes, the
+  // Everything except: /api/v1 (bearer token, src/server/api.ts), /api/cron (CRON_SECRET), Auth.js's own routes, the
   // sign-in page, and static files (the sign-in page shows /limechat-icon.svg).
   matcher: [
-    "/((?!api/v1(?:/|$)|api/auth(?:/|$)|signin(?:/|$)|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!api/v1(?:/|$)|api/auth(?:/|$)|api/cron(?:/|$)|signin(?:/|$)|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

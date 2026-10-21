@@ -389,3 +389,32 @@ export const savedViews = pgTable(
 );
 
 export type SavedView = typeof savedViews.$inferSelect;
+
+export const notificationStatus = pgEnum("notification_status", ["pending", "sending", "sent", "failed", "skipped"]);
+
+/**
+ * Outbox for Slack notifications. Rows are written in the same transaction as the change that
+ * causes them (a win, a churn), then sent by the dispatcher; `dedupe_key` stops repeats (a deal won
+ * twice after a reopen, or the daily digest running twice).
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(),
+    // "deals" / "alerts" (channels from env), "user:<email>" (a DM), or "create_channel".
+    target: text("target").notNull(),
+    orgId: uuid("org_id").references(() => organizations.id),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: notificationStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("notifications_due_idx").on(t.status, t.nextAttemptAt)],
+);
+
+export type Notification = typeof notifications.$inferSelect;

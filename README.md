@@ -58,6 +58,29 @@ LimeCRM uses the **LimeChat Design System V3** ([Figma](https://www.figma.com/de
   - Use flat exports (`GridCol`, `TableTr`, `TimelineItem`), not `Grid.Col` and friends.
   - Never pass `component={Link}` from a server file; use `AnchorLink` or `ButtonLink` from `src/components/links.tsx`.
 
+## Slack
+
+LimeCRM posts to Slack through its own bot.
+- **Deals channel:** deal wins and losses, and handovers to CS.
+- **Alerts channel:** churn alerts, and renewal reminders 30, 7 and 1 day out.
+- **Client channels:** on a company's first win, it creates `#client-o-<company>`, invites the AE, the onboarding manager and Metric Bot, and records the channel on the company.
+- **Morning DMs:** each person gets their overdue and today's tasks and their quiet deals.
+
+Messages go through an outbox (`notifications`): they're queued in the same transaction as the change and sent right after the request. Failures retry with backoff, and admins see everything under **Notifications**. Without a token, messages are recorded as *skipped*, not sent.
+
+Setup:
+1. Create the app from [docs/slack-app-manifest.yml](docs/slack-app-manifest.yml): api.slack.com/apps → Create New App → From a manifest. Then **Install to Workspace**.
+2. Set these environment variables:
+   - `SLACK_BOT_TOKEN`: the Bot User OAuth Token (`xoxb-…`).
+   - `SLACK_DEALS_CHANNEL_ID`: the ID of the deals channel (`C…`, from channel details → About).
+   - `SLACK_ALERTS_CHANNEL_ID`: the ID of the alerts channel.
+   - `SLACK_METRIC_BOT_USER_ID` (optional): Metric Bot's member ID (`U…`), from its profile → ⋯ → Copy member ID.
+3. For a **private** channel, also run `/invite @LimeCRM` in it.
+
+## Scheduled jobs
+
+[vercel.json](vercel.json) runs `/api/cron/dispatch` every 5 minutes (sends and retries) and `/api/cron/daily` at 09:00 IST on weekdays (renewal reminders and morning digests). Both need `Authorization: Bearer $CRON_SECRET`; Vercel sends it automatically when `CRON_SECRET` is set. Elsewhere, call them from any scheduler with that header. Re-running is safe, because each message has a dedupe key.
+
 ## Scripts
 
 | | |
