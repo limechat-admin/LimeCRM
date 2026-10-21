@@ -53,7 +53,8 @@ export function MetricCard({ label, value, hint }: { label: string; value: React
       <Text size="xs" c="dimmed">
         {label}
       </Text>
-      <Text fw={700} fz={24} lh="32px">
+      {/* Shrinks on phones so ₹2,19,99,539 fits a half-width card. */}
+      <Text fw={700} lh="32px" style={{ fontSize: "clamp(18px, 5vw, 24px)", overflowWrap: "anywhere" }}>
         {value}
       </Text>
       {hint && (

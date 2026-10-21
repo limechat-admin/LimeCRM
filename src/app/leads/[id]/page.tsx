@@ -26,9 +26,12 @@ import { Empty, LeadStatusBadge, LifecycleBadge, PageHeader, Section, Stat, Stat
 import { bantTotal, LEAD_STAGES, LEAD_STATUSES, leadStatusMissing, type LeadStatus } from "@/domain/leads";
 import { inr, LIFECYCLE_LABEL, options, shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
-import { getLead, getTimeline, listUsers } from "@/server/queries";
+import { getLead, getTimeline, listUsers, recordTitle } from "@/server/queries";
+import { DateField } from "@/components/date-field";
 
-export const metadata: Metadata = { title: "Lead" };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return { title: (await recordTitle("lead", (await params).id)) ?? "Not found" };
+}
 
 const PRODUCTS = ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform"];
 
@@ -127,8 +130,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
                   <Divider label="Meeting & qualification" labelPosition="left" />
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                    <TextInput name="meetingScheduledAt" label="Meeting date" type="date" defaultValue={lead.meetingScheduledAt ?? ""} />
-                    <TextInput name="meetingCompletedAt" label="Meeting completed" type="date" defaultValue={lead.meetingCompletedAt ?? ""} />
+                    <DateField name="meetingScheduledAt" label="Meeting date" defaultValue={lead.meetingScheduledAt ?? ""} />
+                    <DateField name="meetingCompletedAt" label="Meeting completed" defaultValue={lead.meetingCompletedAt ?? ""} />
                   </SimpleGrid>
                   <TagsInput
                     name="productInterest"

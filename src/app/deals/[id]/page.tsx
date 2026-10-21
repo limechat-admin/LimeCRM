@@ -34,9 +34,12 @@ import { Empty, PageHeader, Section, Stat, StatusBadge } from "@/components/ui";
 import { isOneTime, monthlyValue, periodAmount } from "@/domain/mrr";
 import { CYCLE_LABEL, DEAL_TYPE_LABEL, inr, inrPrecise, LINE_ITEM_LABEL, options, shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
-import { getDeal, getTimeline, listUsers } from "@/server/queries";
+import { getDeal, getTimeline, listUsers, recordTitle } from "@/server/queries";
+import { DateField } from "@/components/date-field";
 
-export const metadata: Metadata = { title: "Deal" };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return { title: (await recordTitle("deal", (await params).id)) ?? "Not found" };
+}
 
 const PLANS = ["Enterprise/ Custom", "LimeBot", "LimeBusiness", "LimeMarketer"];
 const PRODUCTS = ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform"];
@@ -214,7 +217,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                         description="Pick or type, Enter to add"
                       />
                       <Select name="priority" label="Priority" defaultValue={deal.priority} clearable data={options(PRIORITY)} />
-                      <TextInput name="expectedCloseDate" label="Expected close" type="date" defaultValue={deal.expectedCloseDate ?? ""} />
+                      <DateField name="expectedCloseDate" label="Expected close" defaultValue={deal.expectedCloseDate ?? ""} />
                       <TextInput name="source" label="Source" defaultValue={deal.source ?? ""} />
                       <TextInput name="partnerName" label="Partner" defaultValue={deal.partnerName ?? ""} />
                     </SimpleGrid>
@@ -223,8 +226,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                       <Select name="billingCycle" label="Billing cycle" defaultValue={deal.billingCycle} clearable data={options(CYCLE_LABEL)} />
                       <Select name="currency" label="Currency" defaultValue={deal.currency} data={["INR", "USD"]} />
-                      <TextInput name="contractStart" label="Contract start" type="date" defaultValue={deal.contractStart ?? ""} />
-                      <TextInput name="contractRenewal" label="Contract renewal" type="date" defaultValue={deal.contractRenewal ?? ""} />
+                      <DateField name="contractStart" label="Contract start" defaultValue={deal.contractStart ?? ""} />
+                      <DateField name="contractRenewal" label="Contract renewal" defaultValue={deal.contractRenewal ?? ""} />
                       <TextInput
                         name="contractLink"
                         label="Contract link"

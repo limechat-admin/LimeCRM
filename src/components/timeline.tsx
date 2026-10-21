@@ -19,6 +19,7 @@ import { Empty } from "@/components/ui";
 import { taskBucket } from "@/domain/work";
 import { ACTIVITY_LABEL, dateTime, FIELD_LABEL, inr, LIFECYCLE_LABEL, shortDate } from "@/lib/format";
 import type { getTimeline } from "@/server/queries";
+import { DateField } from "@/components/date-field";
 
 type Item = Awaited<ReturnType<typeof getTimeline>>[number];
 type EventItem = Extract<Item, { kind: "event" }>;
@@ -128,7 +129,7 @@ export function Timeline({
           </Group>
           <Textarea name="body" placeholder="Details (optional)" aria-label="Details" />
           <SimpleGrid cols={assignees ? 2 : 1} spacing="xs">
-            <TextInput name="dueDate" type="date" label="Follow-up due" description="Set a date to make it a task" size="xs" />
+            <DateField name="dueDate" label="Follow-up due" description="Set a date to make it a task" size="xs" />
             {assignees && <Select name="assigneeId" label="Assign to" description="Defaults to you" clearable data={assignees} size="xs" />}
           </SimpleGrid>
           <div>

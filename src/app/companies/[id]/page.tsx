@@ -31,9 +31,12 @@ import { Timeline } from "@/components/timeline";
 import { Empty, LifecycleBadge, PageHeader, Section, Stat, StatusBadge } from "@/components/ui";
 import { CHURN_LABEL, DEAL_TYPE_LABEL, initials, inr, LIFECYCLE_LABEL, options, SEGMENT_LABEL, shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
-import { getOrganization, getTimeline, listUsers } from "@/server/queries";
+import { getOrganization, getTimeline, listUsers, recordTitle } from "@/server/queries";
+import { DateField } from "@/components/date-field";
 
-export const metadata: Metadata = { title: "Company" };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return { title: (await recordTitle("organization", (await params).id)) ?? "Not found" };
+}
 
 const HEALTH = { green: "Green", yellow: "Yellow", red: "Red" };
 
@@ -102,8 +105,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
                   <Stack gap="sm">
                     <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
                       <Select name="omId" label="Onboarding manager" defaultValue={openOnboarding.omId} clearable data={userOptions} />
-                      <TextInput name="kickoffDate" label="Kick-off date" type="date" defaultValue={openOnboarding.kickoffDate ?? ""} />
-                      <TextInput name="goLiveDate" label="Go-live date" type="date" defaultValue={openOnboarding.goLiveDate ?? ""} />
+                      <DateField name="kickoffDate" label="Kick-off date" defaultValue={openOnboarding.kickoffDate ?? ""} />
+                      <DateField name="goLiveDate" label="Go-live date" defaultValue={openOnboarding.goLiveDate ?? ""} />
                       <Select name="health" label="Health" defaultValue={openOnboarding.health} clearable data={options(HEALTH)} />
                       <NumberInput name="nps" label="NPS at handoff" min={0} max={10} defaultValue={openOnboarding.nps ?? undefined} hideControls />
                       <TextInput name="voiceAdoption" label="Voice adoption" defaultValue={openOnboarding.voiceAdoption ?? ""} />
@@ -260,9 +263,9 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
                   <ActionForm action={churnAction}>
                     <input type="hidden" name="orgId" value={org.id} />
                     <Stack gap="sm">
-                      <TextInput name="churnedAt" label="Churn date" type="date" defaultValue={today} required />
+                      <DateField name="churnedAt" label="Churn date" defaultValue={today} required />
                       <Select name="category" label="Category" defaultValue="payment" data={options(CHURN_LABEL)} />
-                      <TextInput name="lastBillingDate" label="Last billing date" type="date" />
+                      <DateField name="lastBillingDate" label="Last billing date" />
                       <Textarea name="reason" label="Reason" />
                       <Text size="xs" c="dimmed">
                         Ends every live contract, closes onboarding and drops contracted MRR to ₹0.

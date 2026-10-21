@@ -15,6 +15,7 @@ import {
   users,
 } from "@/db/schema";
 import { missingFields, requiredFieldsFor } from "@/domain/gates";
+import { isUuid } from "@/lib/ids";
 
 export const listUsers = () => db.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.name));
 
@@ -49,6 +50,7 @@ export async function getDealBoard() {
 }
 
 export async function getDeal(id: string) {
+  if (!isUuid(id)) return null;
   const [deal] = await db.select().from(deals).where(eq(deals.id, id));
   if (!deal) return null;
   const [[org], lineItems, salesStages, orgContacts] = await Promise.all([
@@ -88,6 +90,7 @@ export async function listOrganizations() {
 }
 
 export async function getOrganization(id: string) {
+  if (!isUuid(id)) return null;
   const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
   if (!org) return null;
   const [orgDeals, orgContacts, orgOnboardings, onboardingStages] = await Promise.all([
@@ -214,6 +217,7 @@ export async function listLeads(f: LeadFilters, limit = LEAD_PAGE_SIZE) {
 }
 
 export async function getLead(id: string) {
+  if (!isUuid(id)) return null;
   const [lead] = await db.select().from(contacts).where(eq(contacts.id, id));
   if (!lead) return null;
   const [org] = lead.orgId ? await db.select().from(organizations).where(eq(organizations.id, lead.orgId)) : [null];
@@ -236,4 +240,12 @@ export async function listViews(module: string, userId: string) {
     .innerJoin(users, eq(users.id, savedViews.ownerId))
     .where(and(eq(savedViews.module, module), or(eq(savedViews.ownerId, userId), eq(savedViews.shared, true))))
     .orderBy(asc(savedViews.name));
+}
+
+/** Name for the browser tab of a record page. */
+export async function recordTitle(kind: "deal" | "organization" | "lead", id: string): Promise<string | null> {
+  if (!isUuid(id)) return null;
+  if (kind === "deal") return (await db.select({ t: deals.title }).from(deals).where(eq(deals.id, id)))[0]?.t ?? null;
+  if (kind === "organization") return (await db.select({ t: organizations.name }).from(organizations).where(eq(organizations.id, id)))[0]?.t ?? null;
+  return (await db.select({ t: contacts.name }).from(contacts).where(eq(contacts.id, id)))[0]?.t ?? null;
 }

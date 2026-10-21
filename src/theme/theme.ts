@@ -72,7 +72,8 @@ export const limechatTheme = createTheme({
   },
   components: {
     Button: { defaultProps: { fw: 700 } },
-    Badge: { defaultProps: { radius: "xs", variant: "light" }, styles: { root: { fontWeight: 600, letterSpacing: 0 } } },
+    // Badges never truncate ("ACT…"): they keep their full width and the column makes room.
+    Badge: { defaultProps: { radius: "xs", variant: "light" }, styles: { root: { fontWeight: 600, letterSpacing: 0, flexShrink: 0, minWidth: "max-content" } } },
     Card: { defaultProps: { radius: "xs", shadow: "sm", padding: "md" } },
     Paper: { defaultProps: { radius: "xs" } },
     Modal: { defaultProps: { radius: "sm", centered: true } },
