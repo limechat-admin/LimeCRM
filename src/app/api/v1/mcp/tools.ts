@@ -14,6 +14,8 @@ import {
   getDealDetail,
   getLeadDetail,
   getOrganizationDetail,
+  intakeLead,
+  leadInput,
   listApiUsers,
   moveDeal,
   searchDeals,
@@ -274,6 +276,42 @@ export function buildMcpServer(caller: ApiCaller) {
     async ({ leadId, status }) => {
       if (!caller.user) return refuse({ ok: false, status: 403, error: "Writes need a per-user API key" });
       const res = await changeLeadStatus(caller.user, leadId, status);
+      return res.ok ? json(res.data) : refuse(res);
+    },
+  );
+
+  tool(
+    "create_lead",
+    {
+      title: "Create lead",
+      description: [
+        "Add an inbound lead (a person at a company) as the API key's owner, starting at not_contacted.",
+        "Needs a name, a company name and an email or phone. The company is matched by name or created as a prospect.",
+        "If someone with that email is already in LimeCRM, nothing is duplicated: the message is logged on them and created is false.",
+        "sdr and owner are user emails or ids (see list_users).",
+      ].join(" "),
+      inputSchema: {
+        name: z.string().min(1),
+        companyName: z.string().min(1),
+        email: z.string().optional(),
+        phone: z.string().optional(),
+        designation: z.string().optional(),
+        website: z.string().optional(),
+        linkedinUrl: z.string().optional(),
+        source: z.string().optional().describe("Where it came from, e.g. Website demo form; defaults to the API key's name"),
+        productInterest: z.array(z.string()).optional().describe("e.g. Chat, Voice BOT, CRM"),
+        sdr: z.string().optional(),
+        owner: z.string().optional().describe("AE"),
+        message: z.string().optional().describe("What they asked for; logged as a note"),
+      },
+    },
+    async (args) => {
+      if (!caller.user) return refuse({ ok: false, status: 403, error: "Writes need a per-user API key" });
+      const input = leadInput.safeParse(args);
+      if (!input.success) {
+        return refuse({ ok: false, status: 400, error: input.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") });
+      }
+      const res = await intakeLead(caller.user, caller, input.data);
       return res.ok ? json(res.data) : refuse(res);
     },
   );

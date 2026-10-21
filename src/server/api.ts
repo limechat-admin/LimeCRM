@@ -12,7 +12,7 @@ import { bantTotal, isLeadStatus, LEAD_STATUSES } from "@/domain/leads";
 import { isOneTime, monthlyValue } from "@/domain/mrr";
 import { canMoveDeal, canWrite } from "@/domain/permissions";
 import { getDealForAuthz } from "./authz";
-import { setLeadStatus } from "./leads";
+import { createLead, setLeadStatus } from "./leads";
 import { getDeal, getLead, getOrganization, listLeads, listStages } from "./queries";
 import { transitionDeal } from "./transitions";
 
@@ -337,6 +337,67 @@ export async function changeLeadStatus(actor: User, leadId: string, status: stri
   if (res.ok) return { ok: true as const, data: { leadId, status, dealId: res.dealId ?? null, dealCreated: res.dealCreated ?? false } };
   if (res.error) return fail(res.error.includes("not found") ? 404 : 400, res.error);
   return fail(422, "Lead status requirements not met", res.missing);
+}
+
+export const leadInput = z
+  .object({
+    name: z.string().trim().min(1),
+    companyName: z.string().trim().min(1),
+    email: z.email().trim().toLowerCase().nullish(),
+    phone: z.string().trim().min(5).nullish(),
+    designation: z.string().trim().min(1).nullish(),
+    website: z.string().trim().min(1).nullish(),
+    linkedinUrl: z.url().nullish(),
+    source: z.string().trim().min(1).nullish(),
+    productInterest: z.array(z.string().trim().min(1)).nullish(),
+    sdr: z.string().trim().min(1).nullish(),
+    owner: z.string().trim().min(1).nullish(),
+    message: z.string().trim().min(1).nullish(),
+  })
+  .refine((v) => v.email || v.phone, { message: "Give an email or a phone number", path: ["email"] });
+export type LeadInput = z.infer<typeof leadInput>;
+
+/**
+ * Inbound lead (website demo form, AI SDR, partner referral) as `actor`. Someone already in LimeCRM
+ * with the same email isn't duplicated: their `message` is logged on the existing record instead and
+ * the result says `created: false`. The company is matched by name or created as a prospect.
+ */
+export async function intakeLead(actor: User, caller: ApiCaller, input: LeadInput) {
+  const allowed = canWrite(actor.role);
+  if (!allowed.ok) return fail(403, allowed.message);
+  const [sdr, owner] = await Promise.all([input.sdr && resolveUserRef(input.sdr, caller), input.owner && resolveUserRef(input.owner, caller)]);
+  if (sdr && !sdr.ok) return sdr;
+  if (owner && !owner.ok) return owner;
+  const source = input.source ?? (caller.via === "key" ? caller.key.name : "api");
+
+  const [existing] = input.email
+    ? await db.select({ id: contacts.id, orgId: contacts.orgId }).from(contacts).where(sql`lower(${contacts.email}) = ${input.email}`).limit(1)
+    : [];
+  const lead =
+    existing ??
+    (await createLead(
+      {
+        name: input.name,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        designation: input.designation ?? null,
+        companyName: input.companyName,
+        website: input.website ?? null,
+        linkedinUrl: input.linkedinUrl ?? null,
+        source,
+        ownerId: owner ? owner.data.id : null,
+        sdrId: sdr ? sdr.data.id : null,
+      },
+      actor.id,
+    ));
+  if (!existing && input.productInterest?.length) {
+    await db.update(contacts).set({ productInterest: input.productInterest }).where(eq(contacts.id, lead.id));
+  }
+  if (input.message) {
+    const note = await createActivity(actor, { type: "note", subject: existing ? `Inbound again via ${source}` : `Inbound via ${source}`, body: input.message, contactId: lead.id });
+    if (!note.ok) return note;
+  }
+  return { ok: true as const, status: existing ? 200 : 201, data: { leadId: lead.id, orgId: lead.orgId, created: !existing } };
 }
 
 // ---------- activities ----------

@@ -70,6 +70,7 @@ export const OPERATION_SCOPE = {
   search_leads: "read",
   get_lead: "read",
   set_lead_status: "write",
+  create_lead: "write",
   log_activity: "write",
   list_users: "read",
 } as const satisfies Record<string, ApiScope>;

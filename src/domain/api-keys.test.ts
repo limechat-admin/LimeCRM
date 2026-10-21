@@ -103,7 +103,7 @@ describe("canManageApiKeys", () => {
 describe("OPERATION_SCOPE", () => {
   it("needs write for exactly the operations that change data", () => {
     const writes = Object.entries(OPERATION_SCOPE).filter(([, s]) => s === "write").map(([op]) => op);
-    expect(writes.sort()).toEqual(["log_activity", "set_lead_status", "update_deal_stage"]);
+    expect(writes.sort()).toEqual(["create_lead", "log_activity", "set_lead_status", "update_deal_stage"]);
   });
 
   it("lets a read-only key call every read operation and none of the writes", () => {

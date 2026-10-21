@@ -123,6 +123,7 @@ The old shared `LIMECRM_API_TOKEN` still works while it's set, so existing consu
 | POST | `/api/v1/deals/:id/transition` | write | `{ stage }`. 422 with `missing` if the gate isn't met |
 | GET | `/api/v1/leads?status=&owner=&sdr=&q=` | read | Leads (up to 100) with BANT total, plus `counts` per status |
 | GET | `/api/v1/leads/:id` | read | Lead with company and the company's deals |
+| POST | `/api/v1/leads` | write | `{ name, companyName, email? or phone?, designation?, website?, linkedinUrl?, source?, productInterest?, sdr?, owner?, message? }`. For the website demo form and the AI SDR. 201 `{ leadId, orgId, created: true }`. If that email is already in LimeCRM, 200 with `created: false`: nothing is duplicated and `message` is logged on the existing person. `source` defaults to the key's name |
 | POST | `/api/v1/leads/:id/status` | write | `{ status }`. 422 with `missing`; Qualified Meeting / SQL returns the `dealId` it opened or linked |
 | POST | `/api/v1/activities` | write | `{ type, subject, body?, orgId?, dealId?, contactId?, dueAt?, completedAt? }`. Logged as the key's user; 201 |
 
@@ -132,7 +133,7 @@ curl -s -H "Authorization: Bearer $LIMECRM_KEY" "http://localhost:3000/api/v1/de
 
 ### MCP server
 
-`/api/v1/mcp` is a stateless [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) MCP server (official TypeScript SDK) that replaces the Salesmate MCP. It takes the same API keys. Tools: `search_deals`, `get_deal`, `update_deal_stage` (returns the `missing` gate fields when it refuses), `search_organizations`, `get_organization`, `search_leads`, `get_lead`, `set_lead_status`, `log_activity` and `list_users`. The write tools need a read-and-write key.
+`/api/v1/mcp` is a stateless [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) MCP server (official TypeScript SDK) that replaces the Salesmate MCP. It takes the same API keys. Tools: `search_deals`, `get_deal`, `update_deal_stage` (returns the `missing` gate fields when it refuses), `search_organizations`, `get_organization`, `search_leads`, `get_lead`, `create_lead`, `set_lead_status`, `log_activity` and `list_users`. The write tools need a read-and-write key.
 
 For Claude Code, create a key for yourself and add this `.mcp.json` to your project (or `~/.claude.json`), with the key in your shell environment rather than in the file:
 
