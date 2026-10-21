@@ -214,7 +214,18 @@ Explicitly **not** building now: email sequences, dialer and call recording, con
 - **Also done:** CSV export of deals, companies and leads (leads keep the page filters; formula-safe) · lead CSV import (auto-matched columns, preview with per-row problems, skips people already in LimeCRM by email, SDR/AE by email).
 - **Also done:** saved views on Leads (name a filtered list, private or shared with the team; owner or admin can delete).
 - **Also done:** Slack notifications through an outbox (wins, losses, handover to CS, churn alerts, renewal reminders 30/7/1 days, morning digest DMs, client-o channel on first win), admin Notifications page, cron jobs (vercel.json). Waiting on the Slack app token.
-- **Not done yet:** Google Calendar · churn alerts and scheduled reminders (email/Slack) · Chargebee and Helpdesk links · Salesmate cutover.
+- **Also done (2026-10-22):**
+  - **Slack is live** in a sandbox channel: `pnpm slack:check`, colour bars in the LimeChat palette, a bot icon, and `SLACK_SANDBOX_CHANNEL_ID` so dev never DMs people or creates client channels.
+  - **Branding pass:** branded 404, error and loading screens; design-system date inputs (22 Oct 2026); badges no longer truncate; metric tiles fit on phones; browser tabs show the record's name.
+  - **Interim Salesmate load through the MCP** (`migrate:extract-mcp`): open deals only, with no custom fields.
+  - **Old Salesmate links** (`/salesmate/deals/<id>`, or pasted into search) open the migrated deal.
+  - **Lead intake API** (`POST /api/v1/leads`, MCP `create_lead`) for the website form and the AI SDR. It doesn't duplicate people already in LimeCRM.
+  - **Outbound webhooks** (Settings → Webhooks), signed and retried.
+  - **Drag and drop** on the Deals and Onboarding boards.
+  - **Reconnect** as nurture dates with a list and daily AE tasks. The migration turns the Reconnect pipeline into these dates.
+- **Not done yet:**
+  - Needs credentials: Google Calendar (Google OAuth app) · Chargebee link and booked-vs-billed recon (Chargebee API key) · Helpdesk link (Helpdesk API) · full Salesmate extract and cutover (rotated Salesmate token).
+  - Can be built without credentials: bulk edit on lists · hygiene score report · Metabase reporting schema.
 
 | Phase | Weeks | Scope | Exit criteria |
 |---|---|---|---|
