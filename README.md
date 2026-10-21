@@ -76,6 +76,10 @@ Setup:
    - `SLACK_ALERTS_CHANNEL_ID`: the ID of the alerts channel.
    - `SLACK_METRIC_BOT_USER_ID` (optional): Metric Bot's member ID (`U…`), from its profile → ⋯ → Copy member ID.
 3. For a **private** channel, also run `/invite @LimeCRM` in it.
+4. In dev and staging, set `SLACK_SANDBOX_CHANNEL_ID` to a test channel. Every message then goes there, labelled with where it would have gone: no DMs, and no `#client-o-…` channels get created. Leave it empty in production.
+5. Run `pnpm slack:check` to check the token, scopes and channels and post a test message (`--no-post` to only check, `--samples` to post one of each message type).
+
+Messages use the LimeChat palette for the bar down their left edge: lime for wins and digests, green for handovers, red for churn, grey for losses. For the bot's avatar, upload `public/brand/limecrm-slack-icon.png` under the app's **Basic Information → Display Information**.
 
 ## Scheduled jobs
 

@@ -30,9 +30,18 @@ async function call<T = Record<string, unknown>>(method: string, body: Record<st
   return json;
 }
 
-export async function postMessage(channel: string, text: string, blocks: unknown[]) {
-  return call<{ ts: string; channel: string }>("chat.postMessage", { channel, text, blocks, unfurl_links: false, unfurl_media: false });
+/** Post a message. With `color`, the blocks go in an attachment so Slack draws the brand-coloured bar. */
+export async function postMessage(channel: string, text: string, blocks: unknown[], color?: string) {
+  const content = color ? { attachments: [{ color, blocks, fallback: text }] } : { blocks };
+  return call<{ ts: string; channel: string }>("chat.postMessage", { channel, text, ...content, unfurl_links: false, unfurl_media: false });
 }
+
+/**
+ * Sandbox mode (dev and staging): with SLACK_SANDBOX_CHANNEL_ID set, every message goes to that one
+ * channel, DMs and client channels included, labelled with where it would have gone. Nobody gets
+ * DMed and no #client-o channel is created.
+ */
+export const sandboxChannel = () => process.env.SLACK_SANDBOX_CHANNEL_ID || null;
 
 const userIdCache = new Map<string, string | null>();
 

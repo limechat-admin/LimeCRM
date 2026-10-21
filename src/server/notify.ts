@@ -22,7 +22,7 @@ import {
   type SlackMessage,
 } from "@/domain/notify";
 import { istDay } from "@/domain/work";
-import { ensurePublicChannel, invite, postMessage, slackConfigured, SlackError, userIdByEmail } from "./slack";
+import { ensurePublicChannel, invite, postMessage, sandboxChannel, slackConfigured, SlackError, userIdByEmail } from "./slack";
 
 export const appUrl = (path: string) => `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}${path}`;
 
@@ -139,27 +139,41 @@ function channelFor(target: string): string | null {
   return null;
 }
 
+/** Sandbox label prepended to a redirected message. */
+function sandboxed(msg: SlackMessage, wouldGo: string): SlackMessage {
+  return { ...msg, blocks: [{ type: "context", elements: [{ type: "mrkdwn", text: `:test_tube: Sandbox · would go to ${wouldGo}` }] }, ...msg.blocks] };
+}
+
 async function send(n: typeof notifications.$inferSelect): Promise<"sent" | "skipped"> {
+  const sandbox = sandboxChannel();
   if (n.kind === "client_channel") {
     const p = n.payload as { orgId: string; company: string; url: string; ae: string | null; aeEmail: string | null; om: string | null; omEmail: string | null };
+    const intro = clientChannelIntro({ company: p.company, url: p.url, ae: p.ae, om: p.om });
+    if (sandbox) {
+      const who = [p.aeEmail, p.omEmail, process.env.SLACK_METRIC_BOT_USER_ID && "Metric Bot"].filter(Boolean).join(", ") || "nobody";
+      const msg = sandboxed(intro, `a new #${clientChannelName(p.company)}, inviting ${who}`);
+      await postMessage(sandbox, msg.text, msg.blocks, msg.color);
+      return "sent";
+    }
     const channel = await ensurePublicChannel(clientChannelName(p.company));
     const people = await Promise.all([p.aeEmail, p.omEmail].filter((e): e is string => !!e).map(userIdByEmail));
     const metricBot = process.env.SLACK_METRIC_BOT_USER_ID;
     await invite(channel.id, [...people.filter((x): x is string => !!x), ...(metricBot ? [metricBot] : [])]);
-    if (channel.created) {
-      const intro = clientChannelIntro({ company: p.company, url: p.url, ae: p.ae, om: p.om });
-      await postMessage(channel.id, intro.text, intro.blocks);
-    }
+    if (channel.created) await postMessage(channel.id, intro.text, intro.blocks, intro.color);
     await db.update(organizations).set({ clientChannel: `#${channel.name}` }).where(and(eq(organizations.id, p.orgId), sql`${organizations.clientChannel} is null`));
     return "sent";
   }
   const msg = render(n.kind as NotificationKind, n.payload);
   if (!msg) return "skipped";
-  let channel: string | null;
-  if (n.target.startsWith("user:")) channel = await userIdByEmail(n.target.slice(5));
-  else channel = channelFor(n.target);
+  const isDm = n.target.startsWith("user:");
+  if (sandbox) {
+    const out = sandboxed(msg, isDm ? `a DM to ${n.target.slice(5)}` : `the ${n.target} channel`);
+    await postMessage(sandbox, out.text, out.blocks, out.color);
+    return "sent";
+  }
+  const channel = isDm ? await userIdByEmail(n.target.slice(5)) : channelFor(n.target);
   if (!channel) return "skipped";
-  await postMessage(channel, msg.text, msg.blocks);
+  await postMessage(channel, msg.text, msg.blocks, msg.color);
   return "sent";
 }
 

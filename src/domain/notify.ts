@@ -2,7 +2,17 @@
 
 export type NotificationKind = "deal_won" | "deal_lost" | "handed_to_cs" | "churned" | "client_channel" | "daily_digest" | "renewal_due";
 
-export type SlackMessage = { text: string; blocks: unknown[] };
+/** `color` is the bar down the message's left edge, from the LimeChat palette (src/theme/theme.ts). */
+export type SlackMessage = { text: string; blocks: unknown[]; color: string };
+
+/** LimeChat Design System V3 colours, as hex because Slack can't read CSS variables. */
+export const BRAND = {
+  lime: "#6bac1b", // primary: wins, digests
+  limeDark: "#508014", // renewals
+  green: "#16a34a", // handed to CS
+  red: "#da1b21", // churn
+  gray: "#8c8c8c", // losses
+} as const;
 
 const inrFmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 const inr = (n: number) => inrFmt.format(n);
@@ -46,6 +56,7 @@ export function dealWonMessage(p: DealPayload): SlackMessage {
   const who = [p.owner && `AE ${p.owner}`, p.sdr && `SDR ${p.sdr}`].filter(Boolean).join(" · ");
   const extras = [p.products?.length ? p.products.join(", ") : null, p.oneTimeFee > 0 ? `${inr(p.oneTimeFee)} one-time` : null].filter(Boolean).join(" · ");
   return {
+    color: BRAND.lime,
     text: `Won: ${p.title}, ${inr(p.mrr)}/mo`,
     blocks: [
       section(`:tada: *Won:* ${link(p.url, p.title)}\n*${inr(p.mrr)}/mo* · ${esc(p.company)}`),
@@ -56,6 +67,7 @@ export function dealWonMessage(p: DealPayload): SlackMessage {
 
 export function dealLostMessage(p: DealPayload): SlackMessage {
   return {
+    color: BRAND.gray,
     text: `Lost: ${p.title}`,
     blocks: [
       section(`*Lost:* ${link(p.url, p.title)} (${esc(p.stage ?? "Closed Lost")})\n${inr(p.mrr)}/mo · ${esc(p.company)}`),
@@ -78,6 +90,7 @@ export type OrgPayload = {
 
 export function handedToCsMessage(p: OrgPayload): SlackMessage {
   return {
+    color: BRAND.green,
     text: `Handed to CS: ${p.company}`,
     blocks: [
       section(`:handshake: *Handed to CS:* ${link(p.url, p.company)}, ${inr(p.mrr)}/mo`),
@@ -88,6 +101,7 @@ export function handedToCsMessage(p: OrgPayload): SlackMessage {
 
 export function churnedMessage(p: OrgPayload): SlackMessage {
   return {
+    color: BRAND.red,
     text: `Churned: ${p.company}, ${inr(p.mrr)}/mo`,
     blocks: [
       section(`:rotating_light: *Churned:* ${link(p.url, p.company)}\n*${inr(p.mrr)}/mo lost*${p.category ? ` · ${esc(p.category)}` : ""}`),
@@ -98,6 +112,7 @@ export function churnedMessage(p: OrgPayload): SlackMessage {
 
 export function clientChannelIntro(p: { company: string; url: string; ae: string | null; om: string | null }): SlackMessage {
   return {
+    color: BRAND.lime,
     text: `Client channel for ${p.company}`,
     blocks: [
       section(`This is the client channel for ${link(p.url, p.company)}.`),
@@ -111,6 +126,7 @@ export type RenewalPayload = { url: string; company: string; deal: string; renew
 export function renewalDueMessage(p: RenewalPayload): SlackMessage {
   const when = p.daysLeft <= 0 ? "*today*" : `in *${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"}*`;
   return {
+    color: BRAND.limeDark,
     text: `Renewal due: ${p.company} on ${p.renewalDate}`,
     blocks: [section(`:spiral_calendar_pad: *Renewal due* ${when}: ${link(p.url, p.company)} · ${esc(p.deal)} · ${inr(p.mrr)}/mo`), context(esc(`Renews ${p.renewalDate}${p.owner ? ` · ${p.owner}` : ""}`))],
   };
@@ -131,6 +147,7 @@ export function dailyDigestMessage(p: DigestPayload): SlackMessage | null {
     (x): x is string => !!x,
   );
   return {
+    color: BRAND.lime,
     text: `Good morning ${p.name}: ${p.overdue.length} overdue, ${p.today.length} due today, ${p.stale.length} quiet deals`,
     blocks: [section(`Good morning ${esc(p.name.split(" ")[0])}. Here's your LimeCRM day.`), ...parts.map(section), context(link(p.workUrl, "Open My work"))],
   };
