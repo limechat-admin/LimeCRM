@@ -16,7 +16,8 @@
     "db:studio": "drizzle-kit studio",
     "migrate:extract": "tsx scripts/salesmate/extract.ts",
     "migrate:transform": "tsx scripts/salesmate/transform.ts",
-    "migrate:load": "tsx scripts/salesmate/load.ts"
+    "migrate:load": "tsx scripts/salesmate/load.ts",
+    "migrate:extract-mcp": "tsx scripts/salesmate/extract-mcp.ts"
   },
   "dependencies": {
     "@mantine/charts": "9.6.3",

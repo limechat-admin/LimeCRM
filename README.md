@@ -89,6 +89,7 @@ Setup:
 | `pnpm typecheck` / `pnpm lint` | |
 | `pnpm db:generate --name <change>` | New migration after editing `src/db/schema.ts` |
 | `pnpm db:studio` | Browse the database |
+| `pnpm migrate:extract-mcp` | Interim Salesmate snapshot through the local Salesmate MCP (open deals only, no custom fields), then `migrate:transform --snapshot …` and `migrate:load --replace` |
 
 ## API (v1) and MCP
 
