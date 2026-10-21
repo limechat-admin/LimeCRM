@@ -53,6 +53,25 @@
   border-color: var(--mantine-primary-color-filled);
 }
 
+/* drag and drop (board-dnd.tsx) */
+.draggable {
+  cursor: grab;
+}
+
+.draggable:active {
+  cursor: grabbing;
+}
+
+.cardDragging {
+  opacity: 0.45;
+}
+
+.columnOver {
+  background: var(--lc-primary-light);
+  outline: 2px dashed var(--mantine-primary-color-filled);
+  outline-offset: -2px;
+}
+
 /* clickable table rows */
 .rowLink {
   color: inherit;

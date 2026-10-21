@@ -48,13 +48,15 @@ export function Stat({ label, value, align = "left" }: { label: string; value: R
 
 /** Big-number tile, as on the LimeNotes admin page. */
 export function MetricCard({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
+  // Long figures (₹2,19,99,539) shrink to fit the card's width (container units) instead of wrapping;
+  // short ones stay at 24px. A digit is about 0.6em wide in Lato bold.
+  const chars = typeof value === "string" || typeof value === "number" ? String(value).length : 8;
   return (
-    <Card withBorder>
+    <Card withBorder style={{ containerType: "inline-size" }}>
       <Text size="xs" c="dimmed">
         {label}
       </Text>
-      {/* Shrinks on phones so ₹2,19,99,539 fits a half-width card. */}
-      <Text fw={700} lh="32px" style={{ fontSize: "clamp(18px, 5vw, 24px)", overflowWrap: "anywhere" }}>
+      <Text fw={700} lh="32px" style={{ fontSize: `clamp(14px, ${(150 / Math.max(chars, 1)).toFixed(1)}cqi, 24px)`, whiteSpace: "nowrap" }}>
         {value}
       </Text>
       {hint && (
