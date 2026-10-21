@@ -10,6 +10,7 @@ import {
   events,
   onboardings,
   organizations,
+  savedViews,
   stages,
   users,
 } from "@/db/schema";
@@ -225,4 +226,14 @@ export async function getLead(id: string) {
         .orderBy(desc(deals.createdAt))
     : [];
   return { lead, org, deals: orgDeals };
+}
+
+/** Saved views a user can use on a list: their own plus everyone's shared ones. */
+export async function listViews(module: string, userId: string) {
+  return db
+    .select({ id: savedViews.id, name: savedViews.name, query: savedViews.query, shared: savedViews.shared, ownerId: savedViews.ownerId, ownerName: users.name })
+    .from(savedViews)
+    .innerJoin(users, eq(users.id, savedViews.ownerId))
+    .where(and(eq(savedViews.module, module), or(eq(savedViews.ownerId, userId), eq(savedViews.shared, true))))
+    .orderBy(asc(savedViews.name));
 }

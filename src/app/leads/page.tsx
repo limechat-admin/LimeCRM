@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Button,
   Card,
   Grid,
@@ -17,17 +18,20 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { Download, Search, Upload } from "lucide-react";
+import { Download, Search, Upload, Users, X } from "lucide-react";
 import type { Metadata } from "next";
-import { createLeadAction } from "@/app/actions";
+import { createLeadAction, deleteViewAction } from "@/app/actions";
 import classes from "@/components/board.module.css";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { ActionForm, InlineAction, SubmitButton } from "@/components/forms";
+import { SaveViewButton } from "@/components/saved-views";
 import { AnchorLink, LinkButton } from "@/components/links";
 import { Empty, LeadStatusBadge, MetricCard, PageHeader, Section } from "@/components/ui";
 import { bantTotal, LEAD_STATUSES, type LeadStatus } from "@/domain/leads";
 import { shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
-import { listLeads, listUsers, type LeadFilters } from "@/server/queries";
+import { listLeads, listUsers, listViews, type LeadFilters } from "@/server/queries";
+import { canWrite } from "@/domain/permissions";
+import { cleanViewQuery, viewHref } from "@/domain/views";
 
 export const metadata: Metadata = { title: "Leads" };
 
@@ -42,9 +46,10 @@ function href(current: LeadFilters, change: Partial<LeadFilters>) {
 }
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<LeadFilters> }) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   const filters = await searchParams;
-  const [{ rows, byStatus, pageSize }, people] = await Promise.all([listLeads(filters), listUsers()]);
+  const [{ rows, byStatus, pageSize }, people, views] = await Promise.all([listLeads(filters), listUsers(), listViews("leads", user.id)]);
+  const currentQuery = cleanViewQuery("leads", new URLSearchParams(Object.entries(filters).filter(([, v]) => typeof v === "string") as [string, string][]).toString());
   const userOptions = people.map((u) => ({ value: u.id, label: u.name }));
   const total = Object.values(byStatus).reduce((a, n) => a + n, 0);
   const working = ["not_contacted", "attempted_contact", "ongoing", "meeting_scheduled"].reduce((a, k) => a + (byStatus[k] ?? 0), 0);
@@ -92,6 +97,38 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 <SubmitButton variant="default">Filter</SubmitButton>
               </Group>
             </form>
+
+            <Group gap={6} align="center">
+              <Text size="xs" c="dimmed" fw={600}>
+                Views
+              </Text>
+              {views.length === 0 && (
+                <Text size="xs" c="dimmed">
+                  None yet. Filter the list, then save it.
+                </Text>
+              )}
+              {views.map((v) => (
+                <Group key={v.id} gap={2} wrap="nowrap">
+                  <LinkButton
+                    href={viewHref("leads", v.query)}
+                    size="xs"
+                    variant={v.query === currentQuery ? "filled" : "light"}
+                    leftSection={v.shared ? <Users size={12} /> : undefined}
+                  >
+                    {v.name}
+                    {v.shared && v.ownerId !== user.id ? ` · ${v.ownerName.split(" ")[0]}` : ""}
+                  </LinkButton>
+                  {(v.ownerId === user.id || user.role === "admin") && (
+                    <InlineAction action={deleteViewAction} hidden={{ viewId: v.id }}>
+                      <ActionIcon type="submit" size="xs" aria-label={`Delete view ${v.name}`}>
+                        <X size={12} />
+                      </ActionIcon>
+                    </InlineAction>
+                  )}
+                </Group>
+              ))}
+              <SaveViewButton module="leads" query={currentQuery} canShare={canWrite(user.role).ok} />
+            </Group>
 
             <Group gap={6}>
               <LinkButton href={href(filters, { status: undefined })} size="xs" variant={filters.status ? "default" : "filled"}>

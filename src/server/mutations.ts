@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activities, dealLineItems, deals, onboardings, organizations, stages } from "@/db/schema";
+import { activities, savedViews, dealLineItems, deals, onboardings, organizations, stages } from "@/db/schema";
 import { diff, recordEvent } from "./events";
 import { recomputeDeal, recomputeOrg } from "./mrr";
 
@@ -139,4 +139,16 @@ export async function completeTask(id: string) {
     .where(and(eq(activities.id, id), isNull(activities.completedAt)))
     .returning({ id: activities.id });
   return done.length > 0;
+}
+
+export async function createView(input: { ownerId: string; module: string; name: string; query: string; shared: boolean }) {
+  const [view] = await db.insert(savedViews).values(input).returning();
+  return view;
+}
+
+/** Delete a view; only its owner (or an admin) may. Returns false when not allowed or not found. */
+export async function deleteView(id: string, user: { id: string; role: string }) {
+  const where = user.role === "admin" ? eq(savedViews.id, id) : and(eq(savedViews.id, id), eq(savedViews.ownerId, user.id));
+  const gone = await db.delete(savedViews).where(where).returning({ id: savedViews.id });
+  return gone.length > 0;
 }

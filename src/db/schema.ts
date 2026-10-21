@@ -370,3 +370,22 @@ export type Onboarding = typeof onboardings.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Event = typeof events.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
+
+// A named, filtered list (the query string of e.g. /leads), private or shared with everyone.
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id),
+    module: text("module").notNull(),
+    name: text("name").notNull(),
+    query: text("query").notNull().default(""),
+    shared: boolean("shared").notNull().default(false),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("saved_views_module_idx").on(t.module, t.ownerId)],
+);
+
+export type SavedView = typeof savedViews.$inferSelect;

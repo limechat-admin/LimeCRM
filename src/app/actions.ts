@@ -23,6 +23,8 @@ import {
   addLineItem,
   completeTask,
   createDeal,
+  createView,
+  deleteView,
   createOrganization,
   logActivity,
   removeLineItem,
@@ -33,6 +35,7 @@ import {
 import { isLeadStatus, LEAD_STAGES } from "@/domain/leads";
 import { dueAtFromDay } from "@/domain/work";
 import { MAX_IMPORT_ROWS } from "@/domain/csv";
+import { cleanViewQuery, isViewModule, VIEW_MODULES } from "@/domain/views";
 import { importLeads, type ImportSummary } from "@/server/import";
 import { createLead, setLeadStatus, updateLead } from "@/server/leads";
 import { churnOrganization, transitionDeal, transitionOnboarding } from "@/server/transitions";
@@ -425,4 +428,28 @@ export async function importLeadsAction(rows: unknown): Promise<ImportResult> {
   const summary = await importLeads(parsed.data, user.id);
   revalidatePath("/", "layout");
   return { ok: true, summary };
+}
+
+// ---------- saved views ----------
+
+export async function saveViewAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getCurrentUser();
+  const list = fd.get("module");
+  if (!isViewModule(list)) return { ok: false, message: "Unknown list" };
+  const name = String(fd.get("name") ?? "").trim();
+  if (!name) return { ok: false, message: "Give the view a name" };
+  if (name.length > 60) return { ok: false, message: "Keep the name under 60 characters" };
+  const query = cleanViewQuery(list, String(fd.get("query") ?? ""));
+  // Anyone can save a view for themselves; sharing with the team needs write access.
+  const shared = fd.get("shared") === "on" && canWrite(user.role).ok;
+  await createView({ ownerId: user.id, module: list, name, query, shared });
+  revalidatePath(VIEW_MODULES[list].path);
+  return { ok: true, message: shared ? "View saved and shared" : "View saved" };
+}
+
+export async function deleteViewAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getCurrentUser();
+  const done = await deleteView(String(fd.get("viewId")), user);
+  revalidatePath("/", "layout");
+  return done ? { ok: true } : { ok: false, message: "Only the person who saved a view can delete it" };
 }
