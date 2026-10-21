@@ -206,7 +206,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               )}
               <Section title="Activity & history">
                 {org ? (
-                  <Timeline items={timeline} orgId={org.id} contactId={lead.id} />
+                  <Timeline items={timeline} orgId={org.id} contactId={lead.id} assignees={userOptions} />
                 ) : (
                   <Empty compact>Link this lead to a company to log activity</Empty>
                 )}

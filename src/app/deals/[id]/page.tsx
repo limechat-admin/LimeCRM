@@ -265,7 +265,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 </SimpleGrid>
               </Section>
               <Section title="Activity & history">
-                <Timeline items={timeline} orgId={org.id} dealId={deal.id} />
+                <Timeline items={timeline} orgId={org.id} dealId={deal.id} assignees={userOptions} />
               </Section>
             </Stack>
           </GridCol>

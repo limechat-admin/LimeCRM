@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activities, dealLineItems, deals, onboardings, organizations, stages } from "@/db/schema";
 import { diff, recordEvent } from "./events";
@@ -129,4 +129,14 @@ export async function createOrganization(input: { name: string; website: string 
 
 export async function logActivity(input: Omit<typeof activities.$inferInsert, "createdById">, actorId: string) {
   await db.insert(activities).values({ ...input, createdById: actorId });
+}
+
+/** Mark an open task done. Returns false when it doesn't exist or was already completed. */
+export async function completeTask(id: string) {
+  const done = await db
+    .update(activities)
+    .set({ completedAt: new Date() })
+    .where(and(eq(activities.id, id), isNull(activities.completedAt)))
+    .returning({ id: activities.id });
+  return done.length > 0;
 }

@@ -1,0 +1,2 @@
+CREATE INDEX "activities_contact_idx" ON "activities" USING btree ("contact_id");--> statement-breakpoint
+CREATE INDEX "activities_owner_open_idx" ON "activities" USING btree ("owner_id","completed_at","due_at");

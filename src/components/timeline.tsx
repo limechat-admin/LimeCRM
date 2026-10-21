@@ -1,18 +1,23 @@
 import {
+  ActionIcon,
+  Badge,
   Group,
   Select,
+  SimpleGrid,
   Stack,
   Text,
   Textarea,
   TextInput,
   Timeline as MTimeline,
   TimelineItem,
+  Tooltip,
 } from "@mantine/core";
-import { ArrowRightLeft, CircleDot, MessageSquare, Pencil, ReceiptIndianRupee, Sparkles, UserX } from "lucide-react";
-import { logActivityAction } from "@/app/actions";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { ArrowRightLeft, Check, CircleDot, ListTodo, MessageSquare, Pencil, ReceiptIndianRupee, Sparkles, UserX } from "lucide-react";
+import { completeTaskAction, logActivityAction } from "@/app/actions";
+import { ActionForm, InlineAction, SubmitButton } from "@/components/forms";
 import { Empty } from "@/components/ui";
-import { ACTIVITY_LABEL, dateTime, FIELD_LABEL, inr, LIFECYCLE_LABEL } from "@/lib/format";
+import { taskBucket } from "@/domain/work";
+import { ACTIVITY_LABEL, dateTime, FIELD_LABEL, inr, LIFECYCLE_LABEL, shortDate } from "@/lib/format";
 import type { getTimeline } from "@/server/queries";
 
 type Item = Awaited<ReturnType<typeof getTimeline>>[number];
@@ -50,7 +55,7 @@ function describe(item: EventItem) {
 }
 
 function iconFor(item: Item) {
-  if (item.kind === "activity") return <MessageSquare size={12} />;
+  if (item.kind === "activity") return item.a.completedAt ? <MessageSquare size={12} /> : <ListTodo size={12} />;
   switch (item.e.action) {
     case "stage_changed":
     case "lead_status_changed":
@@ -70,7 +75,40 @@ function iconFor(item: Item) {
   }
 }
 
-export function Timeline({ items, orgId, dealId, contactId }: { items: Item[]; orgId: string; dealId?: string; contactId?: string }) {
+/** Due badge for an open task: red when overdue. */
+export function DueBadge({ dueAt, now = new Date() }: { dueAt: Date | null; now?: Date }) {
+  const bucket = taskBucket(dueAt, now);
+  const color = bucket === "overdue" ? "red" : bucket === "today" ? "yellow" : "gray";
+  const label = bucket === "today" ? "Due today" : dueAt ? `Due ${shortDate(dueAt)}` : "No due date";
+  return <Badge color={color}>{label}</Badge>;
+}
+
+/** ✓ button that completes an open task. */
+export function CompleteTaskButton({ activityId, subject }: { activityId: string; subject: string }) {
+  return (
+    <InlineAction action={completeTaskAction} hidden={{ activityId }}>
+      <Tooltip label="Mark done">
+        <ActionIcon type="submit" variant="light" color="green" size="sm" aria-label={`Mark "${subject}" done`}>
+          <Check size={14} />
+        </ActionIcon>
+      </Tooltip>
+    </InlineAction>
+  );
+}
+
+export function Timeline({
+  items,
+  orgId,
+  dealId,
+  contactId,
+  assignees,
+}: {
+  items: Item[];
+  orgId: string;
+  dealId?: string;
+  contactId?: string;
+  assignees?: { value: string; label: string }[];
+}) {
   return (
     <Stack gap="md">
       <ActionForm action={logActivityAction}>
@@ -89,9 +127,13 @@ export function Timeline({ items, orgId, dealId, contactId }: { items: Item[]; o
             <TextInput name="subject" placeholder="What happened?" required style={{ flex: 1 }} aria-label="Subject" />
           </Group>
           <Textarea name="body" placeholder="Details (optional)" aria-label="Details" />
+          <SimpleGrid cols={assignees ? 2 : 1} spacing="xs">
+            <TextInput name="dueDate" type="date" label="Follow-up due" description="Set a date to make it a task" size="xs" />
+            {assignees && <Select name="assigneeId" label="Assign to" description="Defaults to you" clearable data={assignees} size="xs" />}
+          </SimpleGrid>
           <div>
             <SubmitButton variant="default" size="xs">
-              Log activity
+              Save
             </SubmitButton>
           </div>
         </Stack>
@@ -107,12 +149,20 @@ export function Timeline({ items, orgId, dealId, contactId }: { items: Item[]; o
                 <Text size="sm">{describe(item)}</Text>
               ) : (
                 <>
-                  <Text size="sm">
-                    <Text span fw={700}>
-                      {ACTIVITY_LABEL[item.a.type]}:
-                    </Text>{" "}
-                    {item.a.subject}
-                  </Text>
+                  <Group gap="xs" justify="space-between" wrap="nowrap" align="flex-start">
+                    <Text size="sm">
+                      <Text span fw={700}>
+                        {ACTIVITY_LABEL[item.a.type]}:
+                      </Text>{" "}
+                      {item.a.subject}
+                    </Text>
+                    {!item.a.completedAt && (
+                      <Group gap={6} wrap="nowrap">
+                        <DueBadge dueAt={item.a.dueAt} />
+                        <CompleteTaskButton activityId={item.a.id} subject={item.a.subject} />
+                      </Group>
+                    )}
+                  </Group>
                   {item.a.body && (
                     <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
                       {item.a.body}

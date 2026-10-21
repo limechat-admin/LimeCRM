@@ -275,7 +275,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
             )}
 
             <Section title="History">
-              <Timeline items={timeline} orgId={org.id} />
+              <Timeline items={timeline} orgId={org.id} assignees={userOptions} />
             </Section>
           </Stack>
         </GridCol>

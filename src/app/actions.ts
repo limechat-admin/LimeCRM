@@ -21,6 +21,7 @@ import { getDealForAuthz } from "@/server/authz";
 import { diff } from "@/server/events";
 import {
   addLineItem,
+  completeTask,
   createDeal,
   createOrganization,
   logActivity,
@@ -30,6 +31,7 @@ import {
   updateOrganization,
 } from "@/server/mutations";
 import { isLeadStatus, LEAD_STAGES } from "@/domain/leads";
+import { dueAtFromDay } from "@/domain/work";
 import { createLead, setLeadStatus, updateLead } from "@/server/leads";
 import { churnOrganization, transitionDeal, transitionOnboarding } from "@/server/transitions";
 
@@ -283,6 +285,9 @@ const activitySchema = z.object({
   type: z.enum(activityType.enumValues),
   subject: requiredText,
   body: text,
+  // A due date turns the entry into an open task (a follow-up) instead of a logged activity.
+  dueDate: text,
+  assigneeId: text,
 });
 
 export async function logActivityAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -291,9 +296,25 @@ export async function logActivityAction(_: ActionState, fd: FormData): Promise<A
   if (denial) return denial;
   const data = parse(activitySchema, fd);
   if (isFailure(data)) return data;
-  await logActivity({ ...(data as z.infer<typeof activitySchema>), ownerId: user.id, completedAt: new Date() }, user.id);
+  const { dueDate, assigneeId, ...activity } = data as z.infer<typeof activitySchema>;
+  if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { ok: false, message: "Due date must be a date" };
+  await logActivity(
+    dueDate
+      ? { ...activity, ownerId: assigneeId ?? user.id, dueAt: dueAtFromDay(dueDate), completedAt: null }
+      : { ...activity, ownerId: user.id, completedAt: new Date() },
+    user.id,
+  );
   revalidatePath("/", "layout");
-  return { ok: true };
+  return { ok: true, message: dueDate ? "Task added" : undefined };
+}
+
+export async function completeTaskAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getCurrentUser();
+  const denial = denied(canWrite(user.role));
+  if (denial) return denial;
+  const done = await completeTask(String(fd.get("activityId")));
+  revalidatePath("/", "layout");
+  return done ? { ok: true } : { ok: false, message: "That task is already done or no longer exists" };
 }
 
 // ---------- leads ----------

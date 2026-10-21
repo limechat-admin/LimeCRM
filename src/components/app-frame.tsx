@@ -7,24 +7,27 @@ import {
   Avatar,
   Burger,
   Group,
+  Kbd,
   Menu,
   NavLink,
   Stack,
   Text,
+  TextInput,
   Tooltip,
   UnstyledButton,
   useComputedColorScheme,
   useMantineColorScheme,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { Building2, ChartColumn, Handshake, KeyRound, LogOut, Moon, Rocket, Sun, UserRoundSearch } from "lucide-react";
+import { useDisclosure, useHotkeys } from "@mantine/hooks";
+import { Building2, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, Sun, UserRoundSearch } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useRef, type ReactNode } from "react";
 import { signOutAction } from "@/app/actions";
 import { initials } from "@/lib/format";
 
 const NAV = [
+  { href: "/work", label: "My work", icon: ListChecks },
   { href: "/leads", label: "Leads", icon: UserRoundSearch },
   { href: "/deals", label: "Deals", icon: Handshake },
   { href: "/companies", label: "Companies", icon: Building2 },
@@ -34,6 +37,30 @@ const NAV = [
 
 // Admin-only settings, shown under the main navigation.
 const ADMIN_NAV = [{ href: "/settings/api-keys", label: "API keys", icon: KeyRound }];
+
+/** Header search: a plain GET form to /search, so results are a shareable URL. ⌘K / Ctrl+K focuses it. */
+function HeaderSearch() {
+  const ref = useRef<HTMLInputElement>(null);
+  const q = useSearchParams().get("q") ?? "";
+  useHotkeys([["mod+K", () => ref.current?.focus()]]);
+  return (
+    <form action="/search" role="search">
+      <TextInput
+        ref={ref}
+        name="q"
+        key={q}
+        defaultValue={q}
+        placeholder="Search companies, deals, people"
+        aria-label="Search"
+        leftSection={<Search size={16} />}
+        rightSection={<Kbd size="xs">⌘K</Kbd>}
+        rightSectionWidth={44}
+        w={320}
+        visibleFrom="sm"
+      />
+    </form>
+  );
+}
 
 function ColorSchemeToggle() {
   const { setColorScheme } = useMantineColorScheme();
@@ -82,7 +109,7 @@ function UserMenu({ user }: { user: FrameUser }) {
 
 export function AppFrame({ user, children }: { user: FrameUser; children: ReactNode }) {
   const [opened, { toggle, close }] = useDisclosure();
-  const pathname = usePathname() || "/deals";
+  const pathname = usePathname() || "/work";
   return (
     <AppShell
       header={{ height: 60 }}
@@ -93,7 +120,7 @@ export function AppFrame({ user, children }: { user: FrameUser; children: ReactN
         <Group h="100%" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
-            <Link href="/deals" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
+            <Link href="/work" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/limechat-icon.svg" alt="" width={28} height={28} style={{ display: "block" }} />
               <Stack gap={0}>
@@ -107,6 +134,10 @@ export function AppFrame({ user, children }: { user: FrameUser; children: ReactN
             </Link>
           </Group>
           <Group gap="xs" wrap="nowrap">
+            <HeaderSearch />
+            <ActionIcon component={Link} href="/search" size="lg" hiddenFrom="sm" aria-label="Search">
+              <Search size={18} />
+            </ActionIcon>
             <ColorSchemeToggle />
             <UserMenu user={user} />
           </Group>

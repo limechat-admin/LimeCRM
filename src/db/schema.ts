@@ -310,7 +310,13 @@ export const activities = pgTable(
     createdById: uuid("created_by_id").references(() => users.id),
     createdAt: timestamps.createdAt,
   },
-  (t) => [index("activities_org_idx").on(t.orgId), index("activities_deal_idx").on(t.dealId)],
+  (t) => [
+    index("activities_org_idx").on(t.orgId),
+    index("activities_deal_idx").on(t.dealId),
+    index("activities_contact_idx").on(t.contactId),
+    // "My work": a user's open tasks (completed_at is null) by due date.
+    index("activities_owner_open_idx").on(t.ownerId, t.completedAt, t.dueAt),
+  ],
 );
 
 // Append-only audit log. Powers record timelines and every "date entered stage X" report.
