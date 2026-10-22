@@ -87,9 +87,27 @@ Setup:
 
 Messages use the LimeChat palette for the bar down their left edge: lime for wins and digests, green for handovers, red for churn, grey for losses. For the bot's avatar, upload `public/brand/limecrm-slack-icon.png` under the app's **Basic Information → Display Information**.
 
+## Email sync (Gmail)
+
+Each person connects their own Gmail under **Email sync** in the user menu (`/settings/email`). LimeCRM reads it every 10 minutes, read-only:
+
+- **What's logged.** Emails between the person and people outside LimeChat are logged on the contact, the company and the company's open deal, dated when they were sent. They count as touches for stale deals and hygiene.
+- **New people.** Someone new a rep writes to becomes a contact. Their company is matched by email domain, or created; gmail.com and similar get no company.
+- **Incoming mail** is logged only once the sender is a contact, so recruiters, vendors and cold pitches don't become prospects.
+- **Skipped:** internal mail, newsletters (List-Unsubscribe and similar), automated senders, mass mail (more than 20 recipients), drafts, spam and the never-log list (domains or addresses; anyone can add, admins remove).
+- **Stored:** only headers and a 240-character snippet, never the body or attachments.
+- **Duplicates:** a thread with two reps on it is logged once (by Message-ID).
+- **Tokens** are sealed with `MAIL_TOKEN_KEY` (AES-256-GCM). Disconnecting revokes access at Google; emails already logged stay.
+
+Setup, once, in the Google Cloud project used for sign-in:
+1. Enable the Gmail API.
+2. Add the `gmail.readonly` scope to the OAuth consent screen, and keep it **Internal** so Google doesn't need to review the app.
+3. Add `https://<host>/api/gmail/callback` as a redirect URI on the OAuth client.
+4. Set `MAIL_TOKEN_KEY`.
+
 ## Scheduled jobs
 
-[vercel.json](vercel.json) runs `/api/cron/dispatch` every 5 minutes (sends and retries) and `/api/cron/daily` at 09:00 IST on weekdays (renewal reminders and morning digests). Both need `Authorization: Bearer $CRON_SECRET`; Vercel sends it automatically when `CRON_SECRET` is set. Elsewhere, call them from any scheduler with that header. Re-running is safe, because each message has a dedupe key.
+[vercel.json](vercel.json) runs `/api/cron/dispatch` every 5 minutes (sends and retries), `/api/cron/mail` every 10 minutes (Gmail sync) and `/api/cron/daily` at 09:00 IST on weekdays (renewal reminders and morning digests). Both need `Authorization: Bearer $CRON_SECRET`; Vercel sends it automatically when `CRON_SECRET` is set. Elsewhere, call them from any scheduler with that header. Re-running is safe, because each message has a dedupe key.
 
 ## Scripts
 

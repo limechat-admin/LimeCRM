@@ -39,7 +39,10 @@ function describe(item: EventItem) {
     case "created":
       if (e.entityType === "onboarding") return `Onboarding opened from “${d.fromDeal}”`;
       if (d.fromLead) return `Deal opened at ${d.stage} from lead ${d.fromLead}`;
+      if (d.via === "email") return e.entityType === "contact" ? `Contact added from email: ${d.name}` : `Company added from email (${d.domain})`;
       return e.entityType === "contact" ? `Lead created: ${d.name}` : `Created ${e.entityType}`;
+    case "merged":
+      return `Merged in duplicate “${d.from}”`;
     case "line_item_added":
       return `Pricing updated · MRR now ${inr(d.mrr)}`;
     case "line_item_removed":

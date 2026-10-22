@@ -24,7 +24,9 @@ The team used HubSpot before Salesmate. This note covers the four gaps raised on
 - **Privacy:** only work mail of LimeCRM users is read. Each person can see and pause their own sync. The body is stored only as a short snippet. Admins manage the never-log list.
 - **Fallback with no Workspace admin access:** a BCC address (for example `log@crm.limechat.ai`) through an inbound-mail service.
 
-**Needs:** a Google Workspace admin to approve one of these:
+**Decided 2026-10-22:** each user connects their own Gmail (b). **Built:** Settings → Email, `/api/cron/mail`, src/server/mail-sync.ts. It needs the Gmail API enabled and the `gmail.readonly` scope on the sign-in OAuth client (README "Email sync").
+
+**Originally needed:** a Google Workspace admin to approve one of these:
 - (a) a service account with domain-wide delegation for `gmail.readonly` (recommended: no per-person setup), or
 - (b) each user connects their Gmail once.
 

@@ -19,7 +19,7 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure, useHotkeys } from "@mantine/hooks";
-import { BellRing, Building2, CalendarClock, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, ShieldCheck, SlidersHorizontal, Sun, UserRoundSearch, Webhook } from "lucide-react";
+import { BellRing, Building2, CalendarClock, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Mail, Moon, Rocket, Search, ShieldCheck, SlidersHorizontal, Sun, UserRoundSearch, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, type ReactNode } from "react";
@@ -103,6 +103,10 @@ function UserMenu({ user }: { user: FrameUser }) {
             {user.email} · {user.role}
           </Text>
         </Menu.Label>
+        <Menu.Divider />
+        <Menu.Item component={Link} href="/settings/email" leftSection={<Mail size={16} />}>
+          Email sync
+        </Menu.Item>
         <Menu.Divider />
         <form action={signOutAction}>
           <Menu.Item type="submit" component="button" color="red" leftSection={<LogOut size={16} />}>

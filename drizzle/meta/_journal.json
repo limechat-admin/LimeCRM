@@ -64,6 +64,13 @@
       "when": 1792641563396,
       "tag": "0008_field_options",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792643930590,
+      "tag": "0009_gmail_sync",
+      "breakpoints": true
     }
   ]
 }

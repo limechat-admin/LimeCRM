@@ -481,3 +481,60 @@ export const fieldOptions = pgTable(
 );
 
 export type FieldOption = typeof fieldOptions.$inferSelect;
+
+/**
+ * Gmail sync (Settings → Email). One connected mailbox per user, with its refresh token sealed
+ * (src/domain/secret-box.ts) and the Gmail history id to sync from.
+ */
+export const mailAccounts = pgTable("mail_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  refreshTokenSealed: text("refresh_token_sealed").notNull(),
+  historyId: text("history_id"),
+  // active, paused (by its owner), error (sync failing; see last_error), revoked (Google said no)
+  status: text("status").notNull().default("active"),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  messagesLogged: integer("messages_logged").notNull().default(0),
+  connectedAt: timestamps.createdAt,
+});
+
+export type MailAccount = typeof mailAccounts.$inferSelect;
+
+/**
+ * Every email logged from Gmail. `message_id` (the RFC Message-ID) is unique, so a thread with two
+ * reps on it is logged once. Only headers and a short snippet are kept, never the body.
+ */
+export const emailMessages = pgTable(
+  "email_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: text("message_id").notNull().unique(),
+    gmailId: text("gmail_id").notNull(),
+    threadId: text("thread_id"),
+    accountId: uuid("account_id").references(() => mailAccounts.id, { onDelete: "set null" }),
+    direction: text("direction").notNull(),
+    subject: text("subject").notNull(),
+    snippet: text("snippet"),
+    fromEmail: text("from_email").notNull(),
+    participants: jsonb("participants").$type<{ email: string; name: string | null }[]>().notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+    activityId: uuid("activity_id").references(() => activities.id, { onDelete: "set null" }),
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("email_messages_org_idx").on(t.orgId, t.sentAt), index("email_messages_contact_idx").on(t.contactId, t.sentAt)],
+);
+
+/** Never-log list for Gmail sync: a domain ("vendor.com") or an address ("someone@gmail.com"). */
+export const mailExclusions = pgTable("mail_exclusions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  value: text("value").notNull().unique(),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamps.createdAt,
+});

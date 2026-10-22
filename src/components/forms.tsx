@@ -116,7 +116,7 @@ export function StageMover({ action, hidden, stages }: { action: Action; hidden:
   );
 }
 
-/** A one-button form (e.g. remove a row). Errors surface as a toast, since there's no room inline. */
+/** A one-button form (e.g. remove a row). Results surface as a toast, since there's no room inline: errors always, successes when they say something. */
 export function InlineAction({
   action,
   hidden,
@@ -129,6 +129,7 @@ export function InlineAction({
   const [state, formAction] = useActionState(action, null);
   useEffect(() => {
     if (state && !state.ok) notifications.show({ color: "red", message: state.message ?? "Something went wrong" });
+    else if (state?.ok && state.message) notifications.show({ color: "lime", message: state.message });
   }, [state]);
   return (
     <form action={formAction} style={{ display: "inline" }}>
