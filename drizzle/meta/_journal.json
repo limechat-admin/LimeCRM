@@ -57,6 +57,13 @@
       "when": 1792612342184,
       "tag": "0007_reconnect",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792641563396,
+      "tag": "0008_field_options",
+      "breakpoints": true
     }
   ]
 }

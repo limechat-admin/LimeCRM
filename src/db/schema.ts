@@ -460,3 +460,24 @@ export const webhookDeliveries = pgTable(
   },
   (t) => [index("webhook_deliveries_due_idx").on(t.status, t.nextAttemptAt), index("webhook_deliveries_endpoint_idx").on(t.endpointId, t.createdAt)],
 );
+
+/**
+ * Managed picklist values (Settings → Fields). One row per value per field; the catalogue of fields
+ * and their seed values is src/domain/fields.ts. Records store the value itself, so renaming an
+ * option rewrites the records that use it; retiring one keeps it valid on old records but stops
+ * offering it.
+ */
+export const fieldOptions = pgTable(
+  "field_options",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    field: text("field").notNull(),
+    value: text("value").notNull(),
+    position: integer("position").notNull().default(0),
+    retiredAt: timestamp("retired_at", { withTimezone: true }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [uniqueIndex("field_options_field_value_uq").on(t.field, t.value)],
+);
+
+export type FieldOption = typeof fieldOptions.$inferSelect;

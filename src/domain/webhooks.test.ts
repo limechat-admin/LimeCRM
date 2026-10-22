@@ -7,6 +7,7 @@ describe("webhookEventFor", () => {
     expect(webhookEventFor("deal", "line_item_added")).toBe("deal.pricing_changed");
     expect(webhookEventFor("contact", "lead_status_changed")).toBe("lead.status_changed");
     expect(webhookEventFor("organization", "churned")).toBe("organization.churned");
+    expect(webhookEventFor("contact", "merged")).toBe("lead.merged");
   });
   it("publishes nothing for internal records or unknown actions", () => {
     expect(webhookEventFor("api_key", "created")).toBeNull();

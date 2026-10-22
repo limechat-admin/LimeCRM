@@ -12,7 +12,8 @@ import { bantTotal, isLeadStatus, LEAD_STATUSES } from "@/domain/leads";
 import { isOneTime, monthlyValue } from "@/domain/mrr";
 import { canMoveDeal, canWrite } from "@/domain/permissions";
 import { getDealForAuthz } from "./authz";
-import { createLead, setLeadStatus } from "./leads";
+import { FieldValueError } from "./fields";
+import { createLead, setLeadStatus, updateLead } from "./leads";
 import { getDeal, getLead, getOrganization, listLeads, listStages } from "./queries";
 import { transitionDeal } from "./transitions";
 
@@ -362,20 +363,32 @@ export type LeadInput = z.infer<typeof leadInput>;
  * with the same email isn't duplicated: their `message` is logged on the existing record instead and
  * the result says `created: false`. The company is matched by name or created as a prospect.
  */
+/** createLead, with a refused picklist value returned as a 422 instead of thrown. */
+async function createLeadOrRefuse(...args: Parameters<typeof createLead>) {
+  try {
+    return await createLead(...args);
+  } catch (e) {
+    if (e instanceof FieldValueError) return e;
+    throw e;
+  }
+}
+
 export async function intakeLead(actor: User, caller: ApiCaller, input: LeadInput) {
   const allowed = canWrite(actor.role);
   if (!allowed.ok) return fail(403, allowed.message);
   const [sdr, owner] = await Promise.all([input.sdr && resolveUserRef(input.sdr, caller), input.owner && resolveUserRef(input.owner, caller)]);
   if (sdr && !sdr.ok) return sdr;
   if (owner && !owner.ok) return owner;
-  const source = input.source ?? (caller.via === "key" ? caller.key.name : "api");
+  // Source is a managed picklist; the key's name (which app sent it) goes on the note instead.
+  const source = input.source ?? "Inbound";
+  const via = caller.via === "key" ? caller.key.name : source;
 
   const [existing] = input.email
     ? await db.select({ id: contacts.id, orgId: contacts.orgId }).from(contacts).where(sql`lower(${contacts.email}) = ${input.email}`).limit(1)
     : [];
   const lead =
     existing ??
-    (await createLead(
+    (await createLeadOrRefuse(
       {
         name: input.name,
         email: input.email ?? null,
@@ -390,11 +403,17 @@ export async function intakeLead(actor: User, caller: ApiCaller, input: LeadInpu
       },
       actor.id,
     ));
+  if (lead instanceof FieldValueError) return fail(422, lead.message);
   if (!existing && input.productInterest?.length) {
-    await db.update(contacts).set({ productInterest: input.productInterest }).where(eq(contacts.id, lead.id));
+    try {
+      await updateLead(lead.id, { productInterest: input.productInterest }, actor.id);
+    } catch (e) {
+      if (e instanceof FieldValueError) return fail(422, `Lead created, but ${e.message}`);
+      throw e;
+    }
   }
   if (input.message) {
-    const note = await createActivity(actor, { type: "note", subject: existing ? `Inbound again via ${source}` : `Inbound via ${source}`, body: input.message, contactId: lead.id });
+    const note = await createActivity(actor, { type: "note", subject: existing ? `Inbound again via ${via}` : `Inbound via ${via}`, body: input.message, contactId: lead.id });
     if (!note.ok) return note;
   }
   return { ok: true as const, status: existing ? 200 : 201, data: { leadId: lead.id, orgId: lead.orgId, created: !existing } };

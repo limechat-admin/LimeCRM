@@ -5,13 +5,13 @@ import {
   Grid,
   GridCol,
   Group,
+  MultiSelect,
   Select,
   SimpleGrid,
   Stack,
-  TagsInput,
   Text,
-  TextInput,
   Textarea,
+  TextInput,
 } from "@mantine/core";
 import { ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
@@ -28,12 +28,12 @@ import { inr, LIFECYCLE_LABEL, options, shortDate } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth";
 import { getLead, getTimeline, listUsers, recordTitle } from "@/server/queries";
 import { DateField } from "@/components/date-field";
+import { getFieldOptions, selectData } from "@/server/fields";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return { title: (await recordTitle("lead", (await params).id)) ?? "Not found" };
 }
 
-const PRODUCTS = ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform"];
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   await getCurrentUser();
@@ -41,7 +41,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const data = await getLead(id);
   if (!data) notFound();
   const { lead, org, deals } = data;
-  const [people, timeline] = await Promise.all([listUsers(), getTimeline({ contactId: lead.id })]);
+  const [people, timeline, fieldOpts] = await Promise.all([listUsers(), getTimeline({ contactId: lead.id }), getFieldOptions()]);
   const userOptions = people.map((u) => ({ value: u.id, label: u.name }));
   const status = LEAD_STATUSES.find((s) => s.key === lead.leadStatus);
   const total = bantTotal(lead);
@@ -123,8 +123,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                       clearable
                       data={userOptions}
                     />
-                    <TextInput name="source" label="Source" defaultValue={lead.source ?? ""} />
-                    <TextInput name="partnerName" label="Partner" defaultValue={lead.partnerName ?? ""} />
+                    <Select name="source" label="Source" defaultValue={lead.source} clearable searchable data={selectData(fieldOpts, "source", lead.source)} />
+                    <Select name="partnerName" label="Partner" defaultValue={lead.partnerName} clearable searchable data={selectData(fieldOpts, "partner", lead.partnerName)} />
                     <Select name="leadStage" label="Lead stage (marketing)" defaultValue={lead.leadStage} clearable data={options(LEAD_STAGES)} />
                   </SimpleGrid>
 
@@ -133,13 +133,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                     <DateField name="meetingScheduledAt" label="Meeting date" defaultValue={lead.meetingScheduledAt ?? ""} />
                     <DateField name="meetingCompletedAt" label="Meeting completed" defaultValue={lead.meetingCompletedAt ?? ""} />
                   </SimpleGrid>
-                  <TagsInput
+                  <MultiSelect
                     name="productInterest"
                     label="Product interest"
                     description="What was pitched; becomes the deal's products"
                     defaultValue={lead.productInterest}
-                    data={PRODUCTS}
-                    splitChars={[","]}
+                    data={selectData(fieldOpts, "products", lead.productInterest)}
+                    clearable
                   />
                   <BantFields
                     initial={{

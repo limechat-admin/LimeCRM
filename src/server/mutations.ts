@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activities, savedViews, dealLineItems, deals, onboardings, organizations, stages } from "@/db/schema";
 import { diff, recordEvent } from "./events";
+import { standardizePatch } from "./fields";
 import { recomputeDeal, recomputeOrg } from "./mrr";
 
 type DealPatch = Partial<
@@ -29,7 +30,8 @@ type DealPatch = Partial<
   >
 >;
 
-export async function updateDeal(id: string, patch: DealPatch, actorId: string) {
+export async function updateDeal(id: string, raw: DealPatch, actorId: string) {
+  const patch = await standardizePatch("deals", raw);
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(deals).where(eq(deals.id, id));
     const changes = diff(before, patch);
@@ -42,11 +44,12 @@ export async function updateDeal(id: string, patch: DealPatch, actorId: string) 
 type OrgPatch = Partial<
   Pick<
     typeof organizations.$inferInsert,
-    "name" | "website" | "segment" | "industry" | "hqCity" | "aeId" | "omId" | "csmId" | "lcAccountIds" | "chargebeeCustomerId" | "clientChannel" | "health" | "healthNote" | "reconnectOn" | "reconnectReason"
+    "name" | "website" | "segment" | "industry" | "websiteTrafficRange" | "hqCity" | "aeId" | "omId" | "csmId" | "lcAccountIds" | "chargebeeCustomerId" | "clientChannel" | "health" | "healthNote" | "reconnectOn" | "reconnectReason"
   >
 >;
 
-export async function updateOrganization(id: string, patch: OrgPatch, actorId: string) {
+export async function updateOrganization(id: string, raw: OrgPatch, actorId: string) {
+  const patch = await standardizePatch("organizations", raw);
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(organizations).where(eq(organizations.id, id));
     const changes = diff(before, patch);
@@ -119,7 +122,8 @@ export async function createDeal(
   });
 }
 
-export async function createOrganization(input: { name: string; website: string | null; aeId: string | null }, actorId: string) {
+export async function createOrganization(raw: { name: string; website: string | null; aeId: string | null }, actorId: string) {
+  const input = await standardizePatch("organizations", raw);
   return db.transaction(async (tx) => {
     const [org] = await tx.insert(organizations).values(input).returning();
     await recordEvent(tx, { entityType: "organization", entityId: org.id, orgId: org.id, actorId, action: "created", data: { name: org.name } });

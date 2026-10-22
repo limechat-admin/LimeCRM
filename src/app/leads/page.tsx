@@ -35,6 +35,7 @@ import { listLeads, listUsers, listViews, type LeadFilters } from "@/server/quer
 import { CLEAR } from "@/domain/bulk";
 import { canWrite } from "@/domain/permissions";
 import { cleanViewQuery, viewHref } from "@/domain/views";
+import { getFieldOptions, selectData } from "@/server/fields";
 
 export const metadata: Metadata = { title: "Leads" };
 
@@ -51,7 +52,7 @@ function href(current: LeadFilters, change: Partial<LeadFilters>) {
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<LeadFilters> }) {
   const user = await getCurrentUser();
   const filters = await searchParams;
-  const [{ rows, byStatus, pageSize }, people, views] = await Promise.all([listLeads(filters), listUsers(), listViews("leads", user.id)]);
+  const [{ rows, byStatus, pageSize }, people, views, fieldOpts] = await Promise.all([listLeads(filters), listUsers(), listViews("leads", user.id), getFieldOptions()]);
   const currentQuery = cleanViewQuery(
     "leads",
     new URLSearchParams(Object.entries(filters).filter(([, v]) => typeof v === "string") as [string, string][]).toString(),
@@ -261,12 +262,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 <TextInput name="email" label="Work email" type="email" />
                 <TextInput name="phone" label="Phone" />
                 <TextInput name="designation" label="Designation" />
-                <TextInput name="website" label="Website" type="url" placeholder="https://" />
+                <TextInput name="website" label="Website" placeholder="acme.in" />
                 <Select
                   name="source"
                   label="Source"
                   clearable
-                  data={["Inbound", "Outbound", "Paid Ads", "Events", "Referral", "Partnerships", "Self Generation", "AI SDR"]}
+                  data={selectData(fieldOpts, "source")}
                 />
                 <Select name="sdrId" label="SDR" clearable data={userOptions} />
                 <Select name="ownerId" label="Account Executive" clearable data={userOptions} />

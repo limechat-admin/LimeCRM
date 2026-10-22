@@ -4,14 +4,20 @@ import { contacts, deals, organizations, stages } from "@/db/schema";
 import type { MissingField } from "@/domain/gates";
 import { dealStageForLead, leadStatusMissing, type LeadStatus, LEAD_STATUS_LABEL } from "@/domain/leads";
 import { diff, recordEvent } from "./events";
+import { standardizePatch } from "./fields";
 import { recomputeOrg } from "./mrr";
 
 export type LeadResult =
   | { ok: true; dealId?: string; dealCreated?: boolean }
   | { ok: false; missing: MissingField[]; error?: string };
 
-/** Find a company by name (case-insensitive) or create it as a prospect. One company record, always. */
+/**
+ * Find a company by website domain, then by name (case-insensitive), or create it as a prospect.
+ * One company record, always. `website` is already a bare domain (standardizePatch).
+ */
 async function findOrCreateOrg(tx: Tx, name: string, website: string | null, aeId: string | null, actorId: string) {
+  const [byDomain] = website ? await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.website, website)).limit(1) : [];
+  if (byDomain) return byDomain.id;
   const [existing] = await tx
     .select({ id: organizations.id })
     .from(organizations)
@@ -35,7 +41,9 @@ export type NewLead = {
   linkedinUrl?: string | null;
 };
 
-export async function createLead(input: NewLead, actorId: string) {
+export async function createLead(raw: NewLead, actorId: string) {
+  const input = await standardizePatch("contacts", raw);
+  if (input.website) input.website = (await standardizePatch("organizations", { website: input.website })).website;
   return db.transaction(async (tx) => {
     const orgId = await findOrCreateOrg(tx, input.companyName, input.website, input.ownerId, actorId);
     const { name, email, phone, designation, source, ownerId, sdrId, linkedinUrl } = input;
@@ -73,7 +81,8 @@ export type LeadPatch = Partial<
   >
 >;
 
-export async function updateLead(id: string, patch: LeadPatch, actorId: string) {
+export async function updateLead(id: string, raw: LeadPatch, actorId: string) {
+  const patch = await standardizePatch("contacts", raw);
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(contacts).where(eq(contacts.id, id));
     if (!before) return;

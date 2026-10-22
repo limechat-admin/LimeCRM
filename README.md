@@ -127,7 +127,7 @@ The old shared `LIMECRM_API_TOKEN` still works while it's set, so existing consu
 | POST | `/api/v1/deals/:id/transition` | write | `{ stage }`. 422 with `missing` if the gate isn't met |
 | GET | `/api/v1/leads?status=&owner=&sdr=&q=` | read | Leads (up to 100) with BANT total, plus `counts` per status |
 | GET | `/api/v1/leads/:id` | read | Lead with company and the company's deals |
-| POST | `/api/v1/leads` | write | `{ name, companyName, email? or phone?, designation?, website?, linkedinUrl?, source?, productInterest?, sdr?, owner?, message? }`. For the website demo form and the AI SDR. 201 `{ leadId, orgId, created: true }`. If that email is already in LimeCRM, 200 with `created: false`: nothing is duplicated and `message` is logged on the existing person. `source` defaults to the key's name |
+| POST | `/api/v1/leads` | write | `{ name, companyName, email? or phone?, designation?, website?, linkedinUrl?, source?, productInterest?, sdr?, owner?, message? }`. For the website demo form and the AI SDR. 201 `{ leadId, orgId, created: true }`. If that email is already in LimeCRM, 200 with `created: false`: nothing is duplicated and `message` is logged on the existing person. `source`, `productInterest` and the other picklist fields must be values from Settings → Fields (matched loosely: "paid ads" → "Paid Ads"); anything else is a 422 that lists the allowed values. `source` defaults to Inbound |
 | POST | `/api/v1/leads/:id/status` | write | `{ status }`. 422 with `missing`; Qualified Meeting / SQL returns the `dealId` it opened or linked |
 | POST | `/api/v1/activities` | write | `{ type, subject, body?, orgId?, dealId?, contactId?, dueAt?, completedAt? }`. Logged as the key's user; 201 |
 

@@ -6,6 +6,7 @@ import {
   Grid,
   GridCol,
   Group,
+  MultiSelect,
   NumberInput,
   Select,
   SimpleGrid,
@@ -17,7 +18,6 @@ import {
   TableTh,
   TableThead,
   TableTr,
-  TagsInput,
   Text,
   Textarea,
   TextInput,
@@ -36,22 +36,12 @@ import { CYCLE_LABEL, DEAL_TYPE_LABEL, inr, inrPrecise, LINE_ITEM_LABEL, options
 import { getCurrentUser } from "@/server/auth";
 import { getDeal, getTimeline, listUsers, recordTitle } from "@/server/queries";
 import { DateField } from "@/components/date-field";
+import { getFieldOptions, selectData } from "@/server/fields";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return { title: (await recordTitle("deal", (await params).id)) ?? "Not found" };
 }
 
-const PLANS = ["Enterprise/ Custom", "LimeBot", "LimeBusiness", "LimeMarketer"];
-const PRODUCTS = ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform"];
-const LOST_REASONS = [
-  "No Differentiation",
-  "Lost To Competitor - Pricing Gap",
-  "Lost To Competitor - Product Gap",
-  "Budget",
-  "Timeline issues",
-  "AE/SDR Failure",
-  "Signed but never paid",
-];
 const PRIORITY = { high: "High", medium: "Medium", low: "Low" };
 const tabular = { fontVariantNumeric: "tabular-nums" } as const;
 
@@ -61,7 +51,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const data = await getDeal(id);
   if (!data) notFound();
   const { deal, org, lineItems, current, gates, contacts } = data;
-  const [people, timeline] = await Promise.all([listUsers(), getTimeline({ dealId: deal.id, orgId: org.id })]);
+  const [people, timeline, fieldOpts] = await Promise.all([listUsers(), getTimeline({ dealId: deal.id, orgId: org.id }), getFieldOptions()]);
   const userOptions = people.map((u) => ({ value: u.id, label: u.name }));
 
   return (
@@ -207,19 +197,12 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                         clearable
                         data={contacts.map((c) => ({ value: c.id, label: c.name }))}
                       />
-                      <Select name="plan" label="Plan" defaultValue={deal.plan} clearable data={PLANS} />
-                      <TagsInput
-                        name="products"
-                        label="Products"
-                        defaultValue={deal.products}
-                        data={PRODUCTS}
-                        splitChars={[","]}
-                        description="Pick or type, Enter to add"
-                      />
+                      <Select name="plan" label="Plan" defaultValue={deal.plan} clearable data={selectData(fieldOpts, "plan", deal.plan)} />
+                      <MultiSelect name="products" label="Products" defaultValue={deal.products} data={selectData(fieldOpts, "products", deal.products)} clearable />
                       <Select name="priority" label="Priority" defaultValue={deal.priority} clearable data={options(PRIORITY)} />
                       <DateField name="expectedCloseDate" label="Expected close" defaultValue={deal.expectedCloseDate ?? ""} />
-                      <TextInput name="source" label="Source" defaultValue={deal.source ?? ""} />
-                      <TextInput name="partnerName" label="Partner" defaultValue={deal.partnerName ?? ""} />
+                      <Select name="source" label="Source" defaultValue={deal.source} clearable searchable data={selectData(fieldOpts, "source", deal.source)} />
+                      <Select name="partnerName" label="Partner" defaultValue={deal.partnerName} clearable searchable data={selectData(fieldOpts, "partner", deal.partnerName)} />
                     </SimpleGrid>
 
                     <Divider label="Contract" labelPosition="left" />
@@ -245,7 +228,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
                     <Divider label="If lost" labelPosition="left" />
                     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                      <Select name="lostReason" label="Lost reason" defaultValue={deal.lostReason} clearable data={LOST_REASONS} />
+                      <Select name="lostReason" label="Lost reason" defaultValue={deal.lostReason} clearable data={selectData(fieldOpts, "lost_reason", deal.lostReason)} />
                       <Textarea name="lostDetail" label="Detail" defaultValue={deal.lostDetail ?? ""} />
                     </SimpleGrid>
                     <Group>

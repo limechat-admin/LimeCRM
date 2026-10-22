@@ -298,7 +298,7 @@ export function buildMcpServer(caller: ApiCaller) {
         designation: z.string().optional(),
         website: z.string().optional(),
         linkedinUrl: z.string().optional(),
-        source: z.string().optional().describe("Where it came from, e.g. Website demo form; defaults to the API key's name"),
+        source: z.string().optional().describe("Lead source from the Source picklist (Inbound, Outbound, Paid Ads, Events, Referral, Partnerships, Self Generation, AI SDR…); defaults to Inbound"),
         productInterest: z.array(z.string()).optional().describe("e.g. Chat, Voice BOT, CRM"),
         sdr: z.string().optional(),
         owner: z.string().optional().describe("AE"),

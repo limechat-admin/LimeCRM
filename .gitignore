@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Salesmate migration snapshots (raw customer data, never commit)
 /data/
+
+# Parallel Claude Code sessions
+.claude/worktrees/

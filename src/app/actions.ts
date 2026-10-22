@@ -37,6 +37,7 @@ import { dueAtFromDay } from "@/domain/work";
 import { MAX_IMPORT_ROWS } from "@/domain/csv";
 import { cleanViewQuery, isViewModule, VIEW_MODULES } from "@/domain/views";
 import { importLeads, type ImportSummary } from "@/server/import";
+import { FieldValueError } from "@/server/fields";
 import { dispatchPending } from "@/server/notify";
 import { createLead, setLeadStatus, updateLead } from "@/server/leads";
 import { churnOrganization, transitionDeal, transitionOnboarding } from "@/server/transitions";
@@ -67,6 +68,17 @@ function parse<T extends z.ZodTypeAny>(schema: T, fd: FormData): z.infer<T> | Ac
 }
 const isFailure = (v: unknown): v is NonNullable<ActionState> =>
   !!v && typeof v === "object" && "ok" in v && (v as { ok: unknown }).ok === false;
+
+/** Runs a save; a picklist value that isn't allowed comes back as the form's error instead of a crash. */
+async function refusedValue(save: Promise<unknown>): Promise<ActionState> {
+  try {
+    await save;
+    return null;
+  } catch (e) {
+    if (e instanceof FieldValueError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
 
 // ---------- session ----------
 
@@ -131,7 +143,8 @@ export async function saveDealAction(_: ActionState, fd: FormData): Promise<Acti
   if (!deal) return DEAL_NOT_FOUND;
   const denial = denied(canUpdateDeal(user.role, deal.status, Object.keys(diff(deal, patch))));
   if (denial) return denial;
-  await updateDeal(dealId, patch, user.id);
+  const refused = await refusedValue(updateDeal(dealId, patch, user.id));
+  if (refused) return refused;
   revalidatePath("/", "layout");
   return { ok: true, message: "Saved" };
 }
@@ -194,9 +207,11 @@ export async function createOrganizationAction(_: ActionState, fd: FormData): Pr
   if (denial) return denial;
   const data = parse(z.object({ name: requiredText, website: text, aeId: text }), fd);
   if (isFailure(data)) return data;
-  const org = await createOrganization(data as { name: string; website: string | null; aeId: string | null }, user.id);
+  const org = createOrganization(data as { name: string; website: string | null; aeId: string | null }, user.id);
+  const refused = await refusedValue(org);
+  if (refused) return refused;
   revalidatePath("/", "layout");
-  redirect(`/companies/${org.id}`);
+  redirect(`/companies/${(await org).id}`);
 }
 
 const orgSchema = z.object({
@@ -205,6 +220,7 @@ const orgSchema = z.object({
   website: text,
   segment: optEnum(segment.enumValues),
   industry: text,
+  websiteTrafficRange: text,
   hqCity: text,
   aeId: text,
   omId: text,
@@ -223,7 +239,8 @@ export async function saveOrganizationAction(_: ActionState, fd: FormData): Prom
   const data = parse(orgSchema, fd);
   if (isFailure(data)) return data;
   const { orgId, ...patch } = data as z.infer<typeof orgSchema>;
-  await updateOrganization(orgId, patch, user.id);
+  const refused = await refusedValue(updateOrganization(orgId, patch, user.id));
+  if (refused) return refused;
   revalidatePath("/", "layout");
   return { ok: true, message: "Saved" };
 }
@@ -362,9 +379,11 @@ export async function createLeadAction(_: ActionState, fd: FormData): Promise<Ac
   if (denial) return denial;
   const data = parse(newLeadSchema, fd);
   if (isFailure(data)) return data;
-  const lead = await createLead(data as z.infer<typeof newLeadSchema>, user.id);
+  const lead = createLead(data as z.infer<typeof newLeadSchema>, user.id);
+  const refused = await refusedValue(lead);
+  if (refused) return refused;
   revalidatePath("/", "layout");
-  redirect(`/leads/${lead.id}`);
+  redirect(`/leads/${(await lead).id}`);
 }
 
 const leadSchema = z.object({
@@ -397,7 +416,8 @@ export async function saveLeadAction(_: ActionState, fd: FormData): Promise<Acti
   const data = parse(leadSchema, fd);
   if (isFailure(data)) return data;
   const { contactId, ...patch } = data as z.infer<typeof leadSchema>;
-  await updateLead(contactId, patch, user.id);
+  const refused = await refusedValue(updateLead(contactId, patch, user.id));
+  if (refused) return refused;
   revalidatePath("/", "layout");
   return { ok: true, message: "Saved" };
 }

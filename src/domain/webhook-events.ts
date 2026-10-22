@@ -8,12 +8,14 @@ export const WEBHOOK_EVENTS = [
   { key: "organization.updated", label: "Company fields changed" },
   { key: "organization.lifecycle_changed", label: "Company lifecycle changed" },
   { key: "organization.churned", label: "Company churned" },
+  { key: "organization.merged", label: "Duplicate company merged in (changes.fromId is gone)" },
   { key: "onboarding.created", label: "Onboarding opened" },
   { key: "onboarding.updated", label: "Onboarding fields changed" },
   { key: "onboarding.stage_changed", label: "Onboarding moved stage" },
   { key: "lead.created", label: "Lead created" },
   { key: "lead.updated", label: "Lead fields changed" },
   { key: "lead.status_changed", label: "Lead status changed" },
+  { key: "lead.merged", label: "Duplicate lead merged in (changes.fromId is gone)" },
 ] as const;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number]["key"] | "ping";

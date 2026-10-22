@@ -34,6 +34,8 @@ import { getCurrentUser } from "@/server/auth";
 import { getOrganization, getTimeline, listUsers, recordTitle } from "@/server/queries";
 import { DateField } from "@/components/date-field";
 import { ReconnectForm } from "@/components/reconnect-form";
+import { websiteHref } from "@/domain/fields";
+import { getFieldOptions, selectData } from "@/server/fields";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return { title: (await recordTitle("organization", (await params).id)) ?? "Not found" };
@@ -47,7 +49,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   const data = await getOrganization(id);
   if (!data) notFound();
   const { org, deals, contacts, openOnboarding, onboardingGates } = data;
-  const [people, timeline] = await Promise.all([listUsers(), getTimeline({ orgId: org.id })]);
+  const [people, timeline, fieldOpts] = await Promise.all([listUsers(), getTimeline({ orgId: org.id }), getFieldOptions()]);
   const userOptions = people.map((u) => ({ value: u.id, label: u.name }));
   const name = (uid: string | null) => people.find((p) => p.id === uid)?.name ?? "—";
   const today = new Date().toISOString().slice(0, 10);
@@ -61,7 +63,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
             <LifecycleBadge lifecycle={org.lifecycle} label={LIFECYCLE_LABEL[org.lifecycle]} />
             {org.segment && <Badge color="gray">{SEGMENT_LABEL[org.segment]}</Badge>}
             {org.website && (
-              <Anchor href={org.website} target="_blank" rel="noreferrer" size="sm" c="dimmed">
+              <Anchor href={websiteHref(org.website)} target="_blank" rel="noreferrer" size="sm" c="dimmed">
                 {org.website.replace(/^https?:\/\//, "")}
               </Anchor>
             )}
@@ -188,9 +190,16 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
                 <Stack gap="sm">
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                     <TextInput name="name" label="Name" defaultValue={org.name} required />
-                    <TextInput name="website" label="Website" type="url" defaultValue={org.website ?? ""} />
+                    <TextInput name="website" label="Website" placeholder="acme.in" description="Saved as the domain" defaultValue={org.website ?? ""} />
                     <Select name="segment" label="Segment" defaultValue={org.segment} clearable data={options(SEGMENT_LABEL)} />
-                    <TextInput name="industry" label="Industry" defaultValue={org.industry ?? ""} />
+                    <Select name="industry" label="Industry" defaultValue={org.industry} clearable searchable data={selectData(fieldOpts, "industry", org.industry)} />
+                    <Select
+                      name="websiteTrafficRange"
+                      label="Website traffic"
+                      defaultValue={org.websiteTrafficRange}
+                      clearable
+                      data={selectData(fieldOpts, "traffic_band", org.websiteTrafficRange)}
+                    />
                     <TextInput name="hqCity" label="HQ city" defaultValue={org.hqCity ?? ""} />
                     <TextInput
                       name="lcAccountIds"

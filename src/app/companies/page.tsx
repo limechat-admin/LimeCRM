@@ -206,7 +206,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
             <ActionForm action={createOrganizationAction}>
               <Stack gap="sm">
                 <TextInput name="name" label="Name" required />
-                <TextInput name="website" label="Website" type="url" placeholder="https://" />
+                <TextInput name="website" label="Website" placeholder="acme.in" />
                 <Select name="aeId" label="Account Executive" placeholder="Pick a person" clearable data={userOptions} />
                 <SubmitButton fullWidth>Create company</SubmitButton>
               </Stack>

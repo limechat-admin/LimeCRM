@@ -14,6 +14,7 @@ const ACTION_SUFFIX: Record<string, string> = {
   lifecycle_changed: "lifecycle_changed",
   churned: "churned",
   lead_status_changed: "status_changed",
+  merged: "merged",
 };
 const KNOWN = new Set<string>(WEBHOOK_EVENTS.map((e) => e.key));
 

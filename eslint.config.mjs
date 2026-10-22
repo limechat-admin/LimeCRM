@@ -4,7 +4,8 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = [
   ...nextVitals,
   ...nextTs,
-  { ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "drizzle/**"] },
+  // .claude/worktrees holds parallel sessions' checkouts; they lint themselves.
+  { ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "drizzle/**", ".claude/**", "data/**"] },
 ];
 
 export default eslintConfig;

@@ -19,7 +19,7 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure, useHotkeys } from "@mantine/hooks";
-import { BellRing, Building2, CalendarClock, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, Sun, UserRoundSearch, Webhook } from "lucide-react";
+import { BellRing, Building2, CalendarClock, ChartColumn, Handshake, KeyRound, ListChecks, LogOut, Moon, Rocket, Search, ShieldCheck, SlidersHorizontal, Sun, UserRoundSearch, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, type ReactNode } from "react";
@@ -41,6 +41,8 @@ const ADMIN_NAV = [
   { href: "/settings/api-keys", label: "API keys", icon: KeyRound },
   { href: "/settings/notifications", label: "Notifications", icon: BellRing },
   { href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+  { href: "/settings/fields", label: "Fields", icon: SlidersHorizontal },
+  { href: "/settings/data-quality", label: "Data quality", icon: ShieldCheck },
 ];
 
 /** Header search: a plain GET form to /search, so results are a shareable URL. ⌘K / Ctrl+K focuses it. */
