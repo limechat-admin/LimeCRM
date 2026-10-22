@@ -60,7 +60,13 @@ export function standardizePlan(plan: Plan, allowed: Record<PicklistKey, string[
     d.plan = one("plan", d.plan);
     d.products = many("products", d.products);
     // A lost deal must keep a reason (the Closed Lost gate), so an unmatched one becomes the retired "Unknown (migrated)".
-    if (d.lostReason !== null) d.lostReason = one("lost_reason", d.lostReason, "Unknown (migrated)");
+    // Salesmate's "Why Closed Lost?" is a multi-select (",Timeline issues,AE/SDR Failure,"); LimeCRM keeps the first reason.
+    // The whole value is tried first: some reasons contain a comma ("Signed, never paid (Sales Churn)").
+    if (d.lostReason !== null) {
+      const whole = matchOption(d.lostReason, allowed.lost_reason, PICKLIST.lost_reason.aliases);
+      const first = d.lostReason.split(/[,;]/).map((x) => x.trim()).find(Boolean) ?? d.lostReason;
+      d.lostReason = one("lost_reason", whole ? d.lostReason : first, "Unknown (migrated)");
+    }
   }
   return census;
 }

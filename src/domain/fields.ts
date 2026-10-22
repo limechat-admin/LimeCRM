@@ -34,9 +34,18 @@ export const PICKLISTS: PicklistDef[] = [
       { table: "deals", column: "source", label: "Deal source" },
     ],
     // The SDR SOP's sources; Salesmate's deal sources (Ads, Referrals, Website, Word of mouth) map onto them.
-    seeds: ["Inbound", "Outbound", "Paid Ads", "Events", "Referral", "Partnerships", "Self Generation", "AI SDR", "Existing customer"],
+    seeds: ["Inbound", "Outbound", "Paid Ads", "Email marketing", "Events", "Referral", "Partnerships", "Self Generation", "AI SDR", "Existing customer"],
     aliases: {
       ads: "Paid Ads",
+      "paid search": "Paid Ads",
+      "paid social": "Paid Ads",
+      organic: "Inbound",
+      "social media": "Inbound",
+      "weekly emailer": "Email marketing",
+      "email/newsletter": "Email marketing",
+      newsletter: "Email marketing",
+      "sheet allocation (outbound)": "Outbound",
+      "sheet allocation": "Outbound",
       ppc: "Paid Ads",
       "google ads": "Paid Ads",
       "meta ads": "Paid Ads",
@@ -143,7 +152,7 @@ export const PICKLISTS: PicklistDef[] = [
       { table: "contacts", column: "product_interest", label: "Lead product interest" },
     ],
     // Salesmate's Product Type list. Its "Products in Scope" features map onto these where it's clear.
-    seeds: ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform"],
+    seeds: ["Chat BOT", "Voice BOT", "Helpdesk", "Marketing Platform", "CRM"],
     aliases: {
       chat: "Chat BOT",
       chatbot: "Chat BOT",
@@ -199,7 +208,8 @@ export const PICKLISTS: PicklistDef[] = [
     columns: [{ table: "organizations", column: "website_traffic_range", label: "Company website traffic" }],
     // Salesmate's nine bands, written consistently.
     seeds: ["0–10K", "11K–29K", "30K–49K", "50K–99K", "100K–149K", "150K–299K", "300K–1M", "1M–3M", "3M+"],
-    aliases: { "more than 3m": "3M+", ">3m": "3M+", "3m and above": "3M+" },
+    // Salesmate's older bands fit inside the current ones.
+    aliases: { "more than 3m": "3M+", ">3m": "3M+", "3m and above": "3M+", "300k-500k": "300K–1M", "500k-999k": "300K–1M" },
   },
 ];
 
