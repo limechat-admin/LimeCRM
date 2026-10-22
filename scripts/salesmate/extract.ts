@@ -73,6 +73,33 @@ const FIELD_ENDPOINTS = (module: string, moduleId: number) => [
   `/apis/${module.toLowerCase()}/v4/fields`,
 ];
 
+/**
+ * The field schema (internal key → label for every field, custom ones included). Not in the public
+ * docs, but the web app's own /fe/all-visible-fields answers to the API key. It returns every
+ * module at once; it's split per module so a label used on both deals and companies (LC Account
+ * ID) resolves to the right key for each.
+ */
+const SCHEMA_ENDPOINT = "/fe/all-visible-fields";
+const SCHEMA_MODULES = { deal: "fields-deal", contact: "fields-contact", company: "fields-company" } as const;
+
+async function fieldSchema() {
+  if (Object.values(SCHEMA_MODULES).every((n) => existsSync(join(dir, "meta", `${n}.json`)))) return;
+  try {
+    const data = (await api.request("GET", SCHEMA_ENDPOINT)) as Record<string, unknown>[] | Record<string, unknown>;
+    const blocks = Array.isArray(data) ? data : [data];
+    for (const [module, name] of Object.entries(SCHEMA_MODULES)) {
+      const fields = blocks.flatMap((b) => (Array.isArray(b[module]) ? (b[module] as unknown[]) : []));
+      if (!fields.length) continue;
+      writeJson(join(dir, "meta", `${name}.json`), { endpoint: SCHEMA_ENDPOINT, data: fields }, true);
+      manifest.probes[name] = SCHEMA_ENDPOINT;
+      console.log(`  ${name}: ${fields.length} fields from ${SCHEMA_ENDPOINT}`);
+    }
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status >= 500) throw e;
+    console.warn(`  ${SCHEMA_ENDPOINT} refused (${e.status}); trying the other field endpoints`);
+  }
+}
+
 type Manifest = {
   startedAt: string;
   completedAt?: string;
@@ -244,6 +271,7 @@ async function main() {
 
   console.log("probing users and field metadata");
   await probe("users", USER_ENDPOINTS);
+  await fieldSchema();
   for (const [name, id] of [["Deal", 4], ["Contact", 1], ["Company", 5]] as const) {
     await probe(`fields-${name.toLowerCase()}`, FIELD_ENDPOINTS(name, id));
   }

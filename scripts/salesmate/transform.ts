@@ -9,6 +9,7 @@
  *   groups.csv          every collapsed sale (Sales + OB + CS deal ids) with its score
  *   custom-fields.csv   census of every Salesmate custom-field key (to pin unresolved fields in fields.ts)
  *   reconnect.csv       Reconnect-pipeline deals (not migrated as deals; see README)
+ *   value-mapping.csv   every Salesmate dropdown value that isn't already LimeCRM-standard, and what it became
  *   report-preview.md   the reconciliation computed in memory, before any DB load
  */
 import { randomUUID } from "node:crypto";
@@ -39,6 +40,7 @@ import {
 import { loadSnapshot, type SmDeal, type Snapshot } from "./normalize";
 import type { BaselineRow, Flag, Plan, PlanActivity, PlanContact, PlanDeal, PlanLineItem, PlanOnboarding, PlanOrg, PlanReconnect, PlanUser } from "./plan";
 import { reconciliationMarkdown } from "./report";
+import { allowedValues, censusRows, standardizePlan } from "./standardize";
 
 /** MRR above this (₹/month) is almost certainly a data-entry error (e.g. TCV typed into Value). */
 export const MRR_OUTLIER = 500_000;
@@ -738,8 +740,14 @@ function main() {
   const snap = loadSnapshot(dir);
   const plan = buildPlan(snap);
   const out = join(dir, "out");
+  // Field standards (src/domain/fields.ts) before anything is written: the load inserts as-is.
+  const census = standardizePlan(plan, allowedValues());
 
   writeJson(join(out, "plan.json"), plan);
+  const mapping = censusRows(census);
+  writeText(join(out, "value-mapping.csv"), toCsv(mapping));
+  const cleared = mapping.filter((r) => r.limecrm_value.startsWith("(cleared"));
+  console.log(`values: ${mapping.length - cleared.length} mapped to standard, ${cleared.length} not on any list (cleared) → ${join(out, "value-mapping.csv")}`);
 
   const groupRows = plan.deals.map((d) => ({
     group: d.groupKey,

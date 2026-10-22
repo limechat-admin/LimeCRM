@@ -95,7 +95,7 @@ export const COMPANY_FIELDS = {
   chargebeeCustomerId: { labels: ["Chargebee Customer ID"] },
   brandWebsite: { labels: ["Brand Website"] },
   domain: { labels: ["Company Domain Name"] },
-  websiteTrafficRange: { labels: ["Website Traffic Range"] },
+  websiteTrafficRange: { labels: ["Website Traffic Range (Cloned)", "Website Traffic Range"] },
 } satisfies Record<string, FieldDef>;
 
 export const CONTACT_FIELDS = {

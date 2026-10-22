@@ -16,11 +16,14 @@ describe("matchOption", () => {
     expect(matchOption("", source.seeds)).toBeNull();
     expect(matchOption("carrier pigeon", source.seeds, source.aliases)).toBeNull();
   });
-  it("matches traffic bands written different ways", () => {
+  it("matches Salesmate's traffic bands and partner spellings", () => {
     const t = PICKLIST.traffic_band;
-    expect(matchOption("50k-500k", t.seeds, t.aliases)).toBe("50K–500K");
-    expect(matchOption("50K - 500K", t.seeds, t.aliases)).toBe("50K–500K");
-    expect(matchOption(">1M", t.seeds, t.aliases)).toBe("1M+");
+    expect(matchOption("150k-299K", t.seeds, t.aliases)).toBe("150K–299K");
+    expect(matchOption("0-10k", t.seeds, t.aliases)).toBe("0–10K");
+    expect(matchOption("More than 3M", t.seeds, t.aliases)).toBe("3M+");
+    const p = PICKLIST.partner;
+    expect(matchOption("Marmetto", p.seeds, p.aliases)).toBe("Marmeto");
+    expect(matchOption("Clevertap", p.seeds, p.aliases)).toBe("CleverTap");
   });
 });
 
