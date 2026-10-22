@@ -8,22 +8,21 @@ import {
   mrrBooked,
   onboardingThroughput,
   pipelineForecast,
-  sdrFunnel,
   weightedMrr,
   type BookOrgRow,
   type ChurnRow,
   type CsvValue,
   type DealType,
-  type LeadRow,
   type OnboardingRow,
 } from "@/app/reports/aggregate";
-import type { DateRange } from "@/app/reports/range";
+import { conversionFunnel, FUNNEL_CUTS, FUNNEL_STEPS, NONE, parseFunnelOptions, type FunnelCut, type FunnelLeadRow, type FunnelOptions } from "@/app/reports/funnel";
+import { monthLabel, type DateRange } from "@/app/reports/range";
 import { db } from "@/db";
 import { activities, contacts, dealLineItems, deals, onboardings, organizations, stages, users } from "@/db/schema";
 import { missingFields, requiredFieldsFor } from "@/domain/gates";
 import { DEAL_CHECKS, dealChecks, LEAD_CHECKS, leadChecks, scoreByPerson, type DealHygieneInput, type LeadHygieneInput } from "@/domain/hygiene";
 import { CHURN_LABEL, DEAL_TYPE_LABEL, LIFECYCLE_LABEL, SEGMENT_LABEL } from "@/lib/format";
-import { isLeadStatus, LEAD_STATUS_LABEL, LEAD_STATUSES, leadStatusMissing, type LeadStatus } from "@/domain/leads";
+import { isLeadStatus, LEAD_STATUSES, leadStatusMissing } from "@/domain/leads";
 
 /** A timestamptz as the calendar day in India. */
 const istDay = (col: unknown) => sql<string>`to_char(${col} at time zone 'Asia/Kolkata', 'YYYY-MM-DD')`;
@@ -116,22 +115,26 @@ export async function getPipeline(range: DateRange) {
   return { ...report, csv };
 }
 
-// ---------- 3. SDR funnel ----------
+// ---------- 3. Conversion funnel ----------
 
-export async function getSdrFunnel(range: DateRange) {
+export async function getFunnel(range: DateRange, opts: FunnelOptions = parseFunnelOptions(() => null)) {
   const sdr = alias(users, "sdr");
+  const ae = alias(users, "ae");
   // The company's first deal won on or after the lead became an SQL.
   const wonDeal = sql`(
-    select d.closed_at, d.mrr from ${deals} d
+    select d.id, d.closed_at, d.mrr from ${deals} d
     where d.org_id = ${contacts.orgId} and d.status = 'won' and d.closed_at is not null
       and (d.closed_at at time zone 'Asia/Kolkata')::date >= ${contacts.sqlAt}
     order by d.closed_at limit 1
   )`;
-  const rows: LeadRow[] = await db
+  const rows: FunnelLeadRow[] = await db
     .select({
       id: contacts.id,
-      name: contacts.name,
       sdrName: sdr.name,
+      aeName: ae.name,
+      source: contacts.source,
+      segment: organizations.segment,
+      productInterest: contacts.productInterest,
       leadStatus: contacts.leadStatus,
       createdOn: istDay(contacts.createdAt),
       meetingScheduledAt: contacts.meetingScheduledAt,
@@ -139,28 +142,47 @@ export async function getSdrFunnel(range: DateRange) {
       qualifiedAt: contacts.qualifiedAt,
       sqlAt: contacts.sqlAt,
       wonOn: sql<string | null>`(select to_char(w.closed_at at time zone 'Asia/Kolkata', 'YYYY-MM-DD') from ${wonDeal} w)`,
+      wonDealId: sql<string | null>`(select w.id from ${wonDeal} w)`,
       wonMrr: sql<number>`coalesce((select w.mrr from ${wonDeal} w), 0)::float8`,
     })
     .from(contacts)
+    .leftJoin(organizations, eq(organizations.id, contacts.orgId))
     .leftJoin(sdr, eq(sdr.id, contacts.sdrId))
+    .leftJoin(ae, eq(ae.id, contacts.ownerId))
     .where(isNotNull(contacts.leadStatus));
-  const report = sdrFunnel(rows, range);
+  const report = conversionFunnel(rows, range, opts);
+  const cut = FUNNEL_CUTS.find((c) => c.value === opts.by)!.label;
   const csv: Csv = {
-    header: ["Lead", "SDR", "Status", "Created", "Meeting scheduled", "Meeting completed", "Qualified", "SQL", "Won", "Won MRR (INR)"],
-    rows: report.rows.map((r) => [
-      r.name,
-      r.sdrName,
-      r.leadStatus ? (LEAD_STATUS_LABEL[r.leadStatus as LeadStatus] ?? r.leadStatus) : null,
-      r.createdOn,
-      r.meetingScheduledAt,
-      r.meetingCompletedAt,
-      r.qualifiedAt,
-      r.sqlAt,
-      r.wonOn,
-      r.wonOn ? r.wonMrr : null,
+    header: [
+      cut,
+      ...(opts.monthly ? ["Month"] : []),
+      ...FUNNEL_STEPS.map((s) => s.label),
+      "Meeting → SQL %",
+      "SQL → won %",
+      "Lead → SQL %",
+      "Median days lead → SQL",
+      "Won MRR (INR)",
+    ],
+    rows: [...report.groups, report.totals].map((l) => [
+      // Months stay `YYYY-MM` so they sort in a spreadsheet.
+      l === report.totals ? "Total" : opts.by === "month" ? l.name : funnelGroupLabel(opts.by, l.name),
+      ...(opts.monthly ? [l.month] : []),
+      ...FUNNEL_STEPS.map((s) => l[s.key]),
+      pctCell(l.meetingToSql),
+      pctCell(l.sqlToWon),
+      pctCell(l.leadToSql),
+      l.medianLeadToSql,
+      l.wonMrr,
     ]),
   };
   return { ...report, csv };
+}
+
+/** A funnel group's display name. */
+export function funnelGroupLabel(by: FunnelCut, key: string) {
+  if (by === "month") return monthLabel(key);
+  if (key !== NONE) return by === "segment" ? (SEGMENT_LABEL[key as keyof typeof SEGMENT_LABEL] ?? key) : key;
+  return { source: "No source", segment: "No segment", product: "No product" }[by as string] ?? key;
 }
 
 // ---------- 4. Customer book ----------
@@ -379,7 +401,6 @@ export async function getHygiene(range: DateRange) {
     (l) => ({ id: l.id, title: l.name, orgName: l.orgName }),
   );
 
-  const pctCell = (n: number | null) => (n === null ? "" : Math.round(n * 100));
   const csv: Csv = {
     header: ["Role", "Person", "Score %", "Records", ...DEAL_CHECKS.map((c) => `${c.label} %`), ...LEAD_CHECKS.map((c) => `Lead ${c.label.toLowerCase()} %`), "Records to fix"],
     rows: [
@@ -406,12 +427,13 @@ export async function getHygiene(range: DateRange) {
   return { ae, sdr: sdrScores, csv };
 }
 
+const pctCell = (n: number | null) => (n === null ? "" : Math.round(n * 100));
 const checkShare = (t: { passed: number; total: number }) => (t.total ? t.passed / t.total : null);
 
 export const REPORTS = {
   mrr: { title: "MRR booked", load: getMrrBooked, fallback: "this_month" },
   pipeline: { title: "Pipeline and forecast", load: getPipeline, fallback: "this_month" },
-  sdr: { title: "SDR funnel", load: getSdrFunnel, fallback: "this_month" },
+  funnel: { title: "Conversion funnel", load: getFunnel, fallback: "quarter" },
   book: { title: "Customer book", load: getCustomerBook, fallback: "quarter" },
   onboarding: { title: "Onboarding throughput", load: getOnboardingThroughput, fallback: "quarter" },
   hygiene: { title: "CRM hygiene", load: getHygiene, fallback: "this_month" },

@@ -225,6 +225,7 @@ Explicitly **not** building now: email sequences, dialer and call recording, con
   - **Reconnect** as nurture dates with a list and daily AE tasks. The migration turns the Reconnect pipeline into these dates.
   - **Bulk edit** on Leads (SDR, AE, status, with the SOP checks per lead) and Companies (AE with their open deals, OM, CSM, segment, reconnect). Companies gained filters.
   - **CRM hygiene report** (the 5% of AE variable). AEs are scored on stage fields, close date, a touch in 14 days, a next step and a primary contact; SDRs on status fields and a touch in 14 days. The report has a fix list and a CSV. Imported deals keep Salesmate's last-modified date, so staleness is right from day one.
+  - **Conversion funnel report** (replaces the SDR funnel card): Lead → Meeting scheduled → Meeting completed → Qualified meeting → SQL → Deal won, with count, conversion from the previous step and from the top, and median days per step. Cohort by leads created in the period or by events in the period; cut by SDR, AE, source, segment, product interest or month, optionally split by month; CSV of the per-group rows. Step 1 of the reporting plan in hubspot-gaps.md §2.
 - **Not done yet:**
   - Needs credentials: Google Calendar (Google OAuth app) · Chargebee link and booked-vs-billed recon (Chargebee API key) · Helpdesk link (Helpdesk API) · full Salesmate extract and cutover (rotated Salesmate token).
   - Can be built without credentials: Metabase reporting schema.

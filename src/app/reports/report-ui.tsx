@@ -29,6 +29,7 @@ export function ReportCard({
   description,
   range,
   rangeNote,
+  csvQuery,
   children,
 }: {
   id: string;
@@ -37,6 +38,8 @@ export function ReportCard({
   range: DateRange;
   /** What the range applies to, when it isn't the whole report. */
   rangeNote?: string;
+  /** Extra query-string pairs for the CSV link (the card's own options). */
+  csvQuery?: string;
   children: ReactNode;
 }) {
   return (
@@ -56,7 +59,7 @@ export function ReportCard({
           <RangeFilter key={rangeParam(range)} report={id} preset={range.preset} from={range.from} to={range.to} />
           <Button
             component="a"
-            href={`/reports/csv/${id}?range=${encodeURIComponent(rangeParam(range))}`}
+            href={`/reports/csv/${id}?range=${encodeURIComponent(rangeParam(range))}${csvQuery ? `&${csvQuery}` : ""}`}
             download
             size="xs"
             variant="default"

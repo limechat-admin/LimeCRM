@@ -5,9 +5,11 @@ import { Empty, HEALTH_COLOR } from "@/components/ui";
 import { LEAD_STATUS_LABEL, LEAD_STATUSES, type LeadStatus } from "@/domain/leads";
 import { CHURN_LABEL, DEAL_TYPE_LABEL, inr, LIFECYCLE_LABEL, SEGMENT_LABEL, shortDate } from "@/lib/format";
 import { DEAL_CHECKS, LEAD_CHECKS } from "@/domain/hygiene";
-import { getCustomerBook, getHygiene, getMrrBooked, getOnboardingThroughput, getPipeline, getSdrFunnel } from "@/server/reports";
+import { getCustomerBook, getHygiene, getMrrBooked, getOnboardingThroughput, getFunnel, getPipeline, funnelGroupLabel } from "@/server/reports";
 import { DEAL_TYPES, HEALTHS, kickoffToHandover, NO_OWNER, weightedMrr, type BookedLine, type DealType } from "./aggregate";
 import { ReportBarChart, type ChartSeries } from "./charts";
+import { FUNNEL_CUTS, funnelQuery, type FunnelLine, type FunnelOptions } from "./funnel";
+import { FunnelControls } from "./funnel-controls";
 import { inRange, monthLabel, type DateRange } from "./range";
 import { DataTable, Kpis, ReportCard, type Column } from "./report-ui";
 
@@ -175,78 +177,128 @@ export async function PipelineCard({ range }: { range: DateRange }) {
   );
 }
 
-// ---------- 3. SDR funnel ----------
+// ---------- 3. Conversion funnel ----------
 
 const STATUS_ORDER = Object.fromEntries(LEAD_STATUSES.map((s, i) => [s.key, i]));
 
-export async function SdrFunnelCard({ range }: { range: DateRange }) {
-  const r = await getSdrFunnel(range);
-  const any = r.totals.scheduled + r.totals.completed + r.totals.qualified + r.totals.sqls > 0;
-  type Cell = (typeof r.bySdrMonth)[number];
+export async function FunnelCard({ range, options }: { range: DateRange; options: FunnelOptions }) {
+  const r = await getFunnel(range, options);
+  const cohort = options.cohort === "created";
+  const cut = FUNNEL_CUTS.find((c) => c.value === options.by)!.label;
+  const sqls = r.totals.sql;
+  const groupName = (l: FunnelLine) => funnelGroupLabel(options.by, l.name);
+  const bold = (n: number) => (
+    <Text fw={700} size="sm">
+      {count(n)}
+    </Text>
+  );
   return (
     <ReportCard
-      id="sdr"
-      title="SDR funnel"
-      description="Meetings, qualified meetings and SQLs per SDR, counted on the day each happened, and how many of the period's SQLs have since been won."
+      id="funnel"
+      title="Conversion funnel"
+      description={
+        <>
+          How leads move from created to a won deal, with conversion and median days at each step. A lead counts at every step up to the
+          furthest it reached, so an SQL with no meeting dates still counts as a meeting. Deal won is the company&apos;s first deal won on or
+          after the SQL date. Meeting → SQL is from completed meetings; median days use leads with both dates recorded.
+        </>
+      }
       range={range}
+      rangeNote={cohort ? "leads created in the period, and how far they've got by today" : "by the day each step happened"}
+      csvQuery={funnelQuery(options)}
     >
+      <FunnelControls report="funnel" options={options} />
       <Kpis
         items={[
-          { label: "Meetings scheduled", value: count(r.totals.scheduled) },
-          { label: "Meetings completed", value: count(r.totals.completed) },
-          { label: "Qualified meetings", value: count(r.totals.qualified) },
-          { label: "SQLs", value: count(r.totals.sqls) },
-          {
-            label: "SQL → won",
-            value: pct(r.conversion.rate),
-            hint: r.conversion.sqls ? `${r.conversion.won} of ${r.conversion.sqls} · ${inr(r.conversion.wonMrr)} MRR` : "No SQLs in period",
-          },
+          { label: cohort ? "Leads created" : "SQLs", value: count(cohort ? r.totals.lead : sqls), hint: cohort ? undefined : `${count(r.totals.lead)} leads created` },
+          { label: "Lead → SQL", value: pct(r.totals.leadToSql), hint: cohort ? plural(sqls, "SQL") : "SQLs ÷ leads created" },
+          { label: "SQL → won", value: pct(r.totals.sqlToWon), hint: sqls ? `${count(r.totals.won)} of ${count(sqls)}` : "No SQLs" },
+          { label: "Lead → SQL (median)", value: days(r.totals.medianLeadToSql) },
+          { label: "Won MRR", value: inr(r.totals.wonMrr), hint: plural(r.totals.won, "lead") + " won" },
         ]}
       />
-      {any && (
-        <ReportBarChart
-          unit="count"
-          dataKey="label"
-          series={[
-            { name: "scheduled", label: "Meetings scheduled", color: SERIES[0] },
-            { name: "completed", label: "Meetings completed", color: SERIES[1] },
-            { name: "qualified", label: "Qualified meetings", color: SERIES[2] },
-            { name: "sqls", label: "SQLs", color: SERIES[3] },
-          ]}
-          data={r.byMonth.map((m) => ({ ...m, label: monthLabel(m.name) }))}
-        />
+      {r.rows.length === 0 ? (
+        <Empty>{cohort ? "No leads were created in this period" : "No lead reached a funnel step in this period"}</Empty>
+      ) : (
+        <>
+          <Grid gap="lg">
+            <GridCol span={{ base: 12, lg: 5 }}>
+              <ReportBarChart
+                unit="count"
+                dataKey="label"
+                horizontal
+                height={40 + r.steps.length * 40}
+                series={[{ name: "count", label: cohort ? "Leads" : "Reached in period", color: SERIES[0] }]}
+                data={r.steps.map((st) => ({ label: st.label, count: st.count }))}
+              />
+            </GridCol>
+            <GridCol span={{ base: 12, lg: 7 }}>
+              <DataTable
+                rows={r.steps}
+                rowKey={(st) => st.key}
+                empty=""
+                columns={[
+                  { label: "Step", render: (st) => st.label, minWidth: 150 },
+                  { label: "Leads", render: (st) => bold(st.count), align: "right" },
+                  { label: "From previous", render: (st) => pct(st.fromPrevious), align: "right" },
+                  { label: "From top", render: (st) => pct(st.fromTop), align: "right" },
+                  { label: "Median days", render: (st) => (st.medianDays === null ? "—" : st.medianDays), align: "right" },
+                ]}
+              />
+            </GridCol>
+          </Grid>
+          <DataTable<FunnelLine>
+            title={`By ${cut === cut.toUpperCase() ? cut : cut.toLowerCase()}${options.monthly ? " and month" : ""}`}
+            rows={r.groups}
+            rowKey={(l) => `${l.name}-${l.month}`}
+            total={r.totals}
+            empty=""
+            columns={[
+              { label: cut, render: groupName, minWidth: 140 },
+              ...(options.monthly ? [{ label: "Month", render: (l: FunnelLine) => (l.month ? monthLabel(l.month) : "") }] : []),
+              { label: "Leads", render: (l) => count(l.lead), align: "right" },
+              { label: "Scheduled", render: (l) => count(l.scheduled), align: "right" },
+              { label: "Completed", render: (l) => count(l.completed), align: "right" },
+              { label: "Qualified", render: (l) => count(l.qualified), align: "right" },
+              { label: "SQLs", render: (l) => bold(l.sql), align: "right" },
+              { label: "Won", render: (l) => count(l.won), align: "right" },
+              { label: "Meeting → SQL", render: (l) => pct(l.meetingToSql), align: "right" },
+              { label: "SQL → won", render: (l) => pct(l.sqlToWon), align: "right" },
+              { label: "Lead → SQL", render: (l) => pct(l.leadToSql), align: "right" },
+              { label: "Days to SQL", render: (l) => (l.medianLeadToSql === null ? "—" : l.medianLeadToSql), align: "right" },
+              { label: "Won MRR", render: money("wonMrr"), align: "right" },
+            ]}
+          />
+          {options.by === "product" && (
+            <Text size="xs" c="dimmed">
+              A lead interested in several products counts once under each, so the rows add up to more than the total.
+            </Text>
+          )}
+          {!cohort && (
+            <Text size="xs" c="dimmed">
+              Each step is counted in the period it happened, whenever the lead was created, so a conversion can pass 100% when earlier leads
+              convert in this period.
+            </Text>
+          )}
+          {cohort && (
+            <Grid gap="lg">
+              <GridCol span={{ base: 12, lg: 5 }}>
+                <DataTable
+                  title="These leads by status now"
+                  rows={[...r.byStatus].sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))}
+                  rowKey={(st) => st.status}
+                  total={{ status: "", count: r.totals.lead }}
+                  empty=""
+                  columns={[
+                    { label: "Status", render: (st) => LEAD_STATUS_LABEL[st.status as LeadStatus] ?? "No status", minWidth: 160 },
+                    { label: "Leads", render: (st) => count(st.count), align: "right" },
+                  ]}
+                />
+              </GridCol>
+            </Grid>
+          )}
+        </>
       )}
-      <Grid gap="lg">
-        <GridCol span={{ base: 12, lg: 8 }}>
-          <DataTable<Cell>
-            title="Per SDR per month"
-            rows={r.bySdrMonth}
-            rowKey={(c) => `${c.sdr}-${c.month}`}
-            empty="No meetings or SQLs in this period"
-            columns={[
-              { label: "SDR", render: (c) => c.sdr, minWidth: 140 },
-              { label: "Month", render: (c) => monthLabel(c.month) },
-              { label: "Scheduled", render: (c) => count(c.scheduled), align: "right" },
-              { label: "Completed", render: (c) => count(c.completed), align: "right" },
-              { label: "Qualified", render: (c) => count(c.qualified), align: "right" },
-              { label: "SQLs", render: (c) => <Text fw={700} size="sm">{count(c.sqls)}</Text>, align: "right" },
-            ]}
-          />
-        </GridCol>
-        <GridCol span={{ base: 12, lg: 4 }}>
-          <DataTable
-            title={`Leads created (${count(r.created)}) by status now`}
-            rows={[...r.byStatus].sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))}
-            rowKey={(s) => s.status}
-            total={{ status: "", count: r.created }}
-            empty="No leads created in this period"
-            columns={[
-              { label: "Status", render: (s) => LEAD_STATUS_LABEL[s.status as LeadStatus] ?? "No status", minWidth: 160 },
-              { label: "Leads", render: (s) => count(s.count), align: "right" },
-            ]}
-          />
-        </GridCol>
-      </Grid>
     </ReportCard>
   );
 }

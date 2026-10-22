@@ -6,10 +6,8 @@ import {
   mrrBooked,
   onboardingThroughput,
   pipelineForecast,
-  sdrFunnel,
   toCsv,
   type BookOrgRow,
-  type LeadRow,
   type OnboardingRow,
   type OpenDealRow,
   type PipelineStage,
@@ -110,55 +108,6 @@ describe("pipelineForecast", () => {
       ["Riya", 5000, 0],
     ]);
     expect(r.noCloseDate).toBe(0);
-  });
-});
-
-describe("sdrFunnel", () => {
-  const lead = (p: Partial<LeadRow>): LeadRow => ({
-    id: crypto.randomUUID(),
-    name: "Lead",
-    sdrName: "Sana",
-    leadStatus: "not_contacted",
-    createdOn: "2026-06-01",
-    meetingScheduledAt: null,
-    meetingCompletedAt: null,
-    qualifiedAt: null,
-    sqlAt: null,
-    wonOn: null,
-    wonMrr: 0,
-    ...p,
-  });
-  const rows = [
-    lead({ leadStatus: "sql", meetingScheduledAt: "2026-07-02", meetingCompletedAt: "2026-07-05", qualifiedAt: "2026-08-01", sqlAt: "2026-08-01", wonOn: "2026-09-10", wonMrr: 12000 }),
-    lead({ leadStatus: "sql", sdrName: null, meetingScheduledAt: "2026-06-20", meetingCompletedAt: "2026-07-01", qualifiedAt: "2026-07-01", sqlAt: "2026-07-01" }),
-    lead({ leadStatus: "meeting_scheduled", createdOn: "2026-09-01", meetingScheduledAt: "2026-10-05" }),
-  ];
-  const r = sdrFunnel(rows, q3);
-
-  it("counts each step on the day it happened", () => {
-    expect(r.totals).toEqual({ scheduled: 1, completed: 2, qualified: 2, sqls: 2 });
-    expect(r.byMonth.map((m) => [m.name, m.scheduled, m.completed, m.qualified, m.sqls])).toEqual([
-      ["2026-07", 1, 2, 1, 1],
-      ["2026-08", 0, 0, 1, 1],
-      ["2026-09", 0, 0, 0, 0],
-    ]);
-  });
-
-  it("splits per SDR per month", () => {
-    expect(r.bySdrMonth).toEqual([
-      { sdr: "Sana", month: "2026-07", scheduled: 1, completed: 1, qualified: 0, sqls: 0 },
-      { sdr: "Sana", month: "2026-08", scheduled: 0, completed: 0, qualified: 1, sqls: 1 },
-      { sdr: "Unassigned", month: "2026-07", scheduled: 0, completed: 1, qualified: 1, sqls: 1 },
-    ]);
-  });
-
-  it("follows the range's SQLs to won deals", () => {
-    expect(r.conversion).toEqual({ sqls: 2, won: 1, rate: 0.5, wonMrr: 12000 });
-  });
-
-  it("buckets leads created in the range by current status", () => {
-    expect(r.created).toBe(1);
-    expect(r.byStatus).toEqual([{ status: "meeting_scheduled", count: 1 }]);
   });
 });
 
