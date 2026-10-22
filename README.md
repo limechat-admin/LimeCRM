@@ -13,6 +13,8 @@ LimeChat's in-house CRM, replacing Salesmate. **LimeCRM is the source of truth**
 
 **Bulk edit:** tick rows on Leads or Companies, then change several at once. Each record still goes through its normal update, so the change is audited, webhooks fire, and lead statuses still need their SOP fields. Leads that can't move are named in the result. **CRM hygiene** (Reports) scores each AE and SDR on the same rules the stage gates and the SOP use, with a list of records to fix.
 
+**Conversion funnel** (Reports) follows leads through Lead created → Meeting scheduled → Meeting completed → Qualified meeting → SQL → Deal won, with each step's count, conversion from the previous step and from the top, and median days. It counts either the leads created in the period (how far they got) or the steps reached in the period, cut by SDR, AE, source, segment, product interest or month (and optionally split by month, e.g. SQL → won by SDR by month). A lead counts at every step up to the furthest it reached; Deal won is the company's first deal won on or after the SQL date. It replaces the old SDR funnel card.
+
 ## Run it locally
 
 ```bash
