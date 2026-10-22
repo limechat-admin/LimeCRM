@@ -538,3 +538,86 @@ export const mailExclusions = pgTable("mail_exclusions", {
   createdById: uuid("created_by_id").references(() => users.id),
   createdAt: timestamps.createdAt,
 });
+
+// ---------- email campaigns (Postmark) ----------
+
+/** An active list: its filters (src/domain/campaigns.ts listFiltersSchema) are evaluated when used. */
+export const emailLists = pgTable("email_lists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  filters: jsonb("filters").$type<Record<string, unknown>>().notNull(),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamps.createdAt,
+  updatedAt: timestamps.updatedAt,
+});
+
+export const campaigns = pgTable("campaigns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  // draft, scheduled, sending, sent, cancelled
+  status: text("status").notNull().default("draft"),
+  listId: uuid("list_id").references(() => emailLists.id, { onDelete: "set null" }),
+  subscriptionType: text("subscription_type").notNull().default("product_updates"),
+  fromName: text("from_name").notNull(),
+  fromEmail: text("from_email").notNull(),
+  replyTo: text("reply_to"),
+  subject: text("subject").notNull().default(""),
+  preheader: text("preheader"),
+  blocks: jsonb("blocks").$type<unknown[]>().notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamps.createdAt,
+  updatedAt: timestamps.updatedAt,
+});
+
+export type Campaign = typeof campaigns.$inferSelect;
+
+/** Who a campaign went to, snapshotted when it starts, and what each person did with it (Postmark webhooks). */
+export const campaignRecipients = pgTable(
+  "campaign_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    vars: jsonb("vars").$type<Record<string, string>>().notNull(),
+    // queued, sent, failed, skipped
+    status: text("status").notNull().default("queued"),
+    skipReason: text("skip_reason"),
+    postmarkMessageId: text("postmark_message_id"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    opens: integer("opens").notNull().default(0),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    clicks: integer("clicks").notNull().default(0),
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    bounceType: text("bounce_type"),
+    complainedAt: timestamp("complained_at", { withTimezone: true }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    error: text("error"),
+  },
+  (t) => [
+    uniqueIndex("campaign_recipients_campaign_email_uq").on(t.campaignId, t.email),
+    index("campaign_recipients_queue_idx").on(t.campaignId, t.status),
+    index("campaign_recipients_message_idx").on(t.postmarkMessageId),
+    index("campaign_recipients_contact_idx").on(t.contactId),
+  ],
+);
+
+/**
+ * Marketing email preferences, by address (one person may be several contacts). Unsubscribes,
+ * opted-out subscription types, and suppression after a hard bounce or spam complaint.
+ */
+export const emailPreferences = pgTable("email_preferences", {
+  email: text("email").primaryKey(),
+  unsubscribedAll: boolean("unsubscribed_all").notNull().default(false),
+  optedOut: text("opted_out").array().notNull().default(sql`'{}'::text[]`),
+  // hard_bounce, spam_complaint, manual
+  suppressed: text("suppressed"),
+  updatedAt: timestamps.updatedAt,
+});

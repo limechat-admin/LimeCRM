@@ -46,3 +46,26 @@ export function verifyState(state: string, secret: string, now = Date.now()): { 
 }
 
 export const newNonce = () => randomBytes(16).toString("base64url");
+
+/**
+ * A signed, non-expiring token (unsubscribe links must work in old emails). Carries small JSON;
+ * anyone holding it can act on that payload only, which is why it holds an email, not a session.
+ */
+export function signToken(payload: Record<string, string>, secret: string): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = createHmac("sha256", keyFrom(secret, "token")).update(body).digest("base64url").slice(0, 22);
+  return `${body}.${sig}`;
+}
+
+export function verifyToken<T extends Record<string, string>>(token: string, secret: string): T | null {
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  const expected = Buffer.from(createHmac("sha256", keyFrom(secret, "token")).update(body).digest("base64url").slice(0, 22));
+  const given = Buffer.from(sig);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  try {
+    return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T;
+  } catch {
+    return null;
+  }
+}

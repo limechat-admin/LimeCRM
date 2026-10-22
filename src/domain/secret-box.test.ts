@@ -27,3 +27,16 @@ describe("state", () => {
     expect(verifyState(s.replace(/^./, "x"), secret, 2_000)).toBeNull();
   });
 });
+
+describe("token", () => {
+  it("round-trips and rejects tampering", async () => {
+    const { signToken, verifyToken } = await import("./secret-box");
+    const t = signToken({ e: "priya@tealeaf.in", c: "camp-1" }, secret);
+    expect(verifyToken(t, secret)).toEqual({ e: "priya@tealeaf.in", c: "camp-1" });
+    expect(verifyToken(t, "other")).toBeNull();
+    const [body, sig] = t.split(".");
+    const forged = Buffer.from(JSON.stringify({ e: "someone@else.com", c: "camp-1" })).toString("base64url");
+    expect(verifyToken(`${forged}.${sig}`, secret)).toBeNull();
+    expect(body).toBeTruthy();
+  });
+});

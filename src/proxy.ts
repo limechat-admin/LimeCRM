@@ -16,15 +16,24 @@ const onSession = (req: NextAuthRequest, _event: NextFetchEvent) => {
 };
 const requireSession = auth(onSession);
 
+/** Pages for people outside LimeChat (email preference links): no sign-in, no app frame. */
+const isPublic = (path: string) => path.startsWith("/u/");
+
 export function proxy(req: NextRequest, event: NextFetchEvent) {
+  if (isPublic(req.nextUrl.pathname)) {
+    const headers = new Headers(req.headers);
+    headers.set("x-lc-public", "1");
+    return NextResponse.next({ request: { headers } });
+  }
   if (devUserEmail()) return NextResponse.next();
   return requireSession(req, event);
 }
 
 export const config = {
-  // Everything except: /api/v1 (bearer token, src/server/api.ts), /api/cron (CRON_SECRET), Auth.js's own routes, the
-  // sign-in page, and static files (the sign-in page shows /limechat-icon.svg).
+  // Everything except: /api/v1 (bearer token, src/server/api.ts), /api/cron (CRON_SECRET), /api/email (Postmark
+  // webhook with Basic auth, and signed one-click unsubscribe links), Auth.js's own routes, the sign-in page, and static
+  // files (the sign-in page shows /limechat-icon.svg). /u/* runs through the proxy only to be marked public.
   matcher: [
-    "/((?!api/v1(?:/|$)|api/auth(?:/|$)|api/cron(?:/|$)|signin(?:/|$)|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!api/v1(?:/|$)|api/auth(?:/|$)|api/cron(?:/|$)|api/email(?:/|$)|signin(?:/|$)|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

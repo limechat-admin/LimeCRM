@@ -118,7 +118,9 @@ The team used HubSpot before Salesmate. This note covers the four gaps raised on
    - These come later, built on the webhooks and daily jobs that already exist.
    - Example: "when a lead goes Deferred, add them to the Reconnect nurture list".
 
-**Needs**
+**Built 2026-10-22, on Postmark:** lists, campaigns with the block editor and live preview, scheduling, subscription types, the preference page, one-click unsubscribe, webhooks and results (README, "Email campaigns"). Still to come: reusable templates (for now, use Duplicate), A/B tests, sequences (they need Gmail send) and nurture automations.
+
+**Originally needed**
 - **A sending provider:** Amazon SES (cheapest at volume), SendGrid or Postmark.
 - **A sending subdomain** (for example `mail.limechat.ai`) with SPF, DKIM and DMARC records added by whoever manages DNS. This keeps campaign reputation separate from everyone's day-to-day mail.
 - **Gmail send permission** for sequences (from §1).

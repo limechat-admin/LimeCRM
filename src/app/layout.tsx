@@ -1,7 +1,7 @@
 import { mantineHtmlProps } from "@mantine/core";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { AppFrame } from "@/components/app-frame";
 import { resolveViewer } from "@/server/auth";
 import { COLOR_SCHEME_COOKIE, parseColorScheme } from "@/theme/color-scheme";
@@ -30,12 +30,14 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // Signed-out screens (/signin, /signout) render without the app frame; pages enforce sign-in themselves.
   const { user } = await resolveViewer();
-  const colorScheme = parseColorScheme((await cookies()).get(COLOR_SCHEME_COOKIE)?.value);
+  // Email preference pages are for customers: light, no app frame, even for a signed-in visitor.
+  const publicPage = (await headers()).get("x-lc-public") === "1";
+  const colorScheme = publicPage ? "light" : parseColorScheme((await cookies()).get(COLOR_SCHEME_COOKIE)?.value);
   return (
     <html lang="en" {...mantineHtmlProps} data-mantine-color-scheme={colorScheme} className={lato.variable}>
       <body>
         <ThemeProvider colorScheme={colorScheme}>
-          {user ? <AppFrame user={{ name: user.name, email: user.email, role: user.role }}>{children}</AppFrame> : children}
+          {user && !publicPage ? <AppFrame user={{ name: user.name, email: user.email, role: user.role }}>{children}</AppFrame> : children}
         </ThemeProvider>
       </body>
     </html>

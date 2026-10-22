@@ -71,6 +71,13 @@
       "when": 1792643930590,
       "tag": "0009_gmail_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792645607312,
+      "tag": "0010_campaigns",
+      "breakpoints": true
     }
   ]
 }

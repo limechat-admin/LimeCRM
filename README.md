@@ -105,9 +105,26 @@ Setup, once, in the Google Cloud project used for sign-in:
 3. Add `https://<host>/api/gmail/callback` as a redirect URI on the OAuth client.
 4. Set `MAIL_TOKEN_KEY`.
 
+## Email campaigns (Postmark)
+
+**Campaigns** in the sidebar.
+- **Lists** are saved filters over leads or contacts: status, SDR, AE, source, products, company lifecycle, segment, industry, traffic, reconnect due. Whoever matches when a campaign sends gets it.
+- **Editing a campaign:** pick a list, a subscription type (Product updates, Webinars and events, Offers and case studies) and a sender, write the subject and preview text, and build the body from blocks (heading, text with **bold** and links, button, image, divider). Personalise with `{{first_name|there}}`, `{{company}}`, `{{ae_name}}` and so on. The preview renders the real email for a list member.
+- **Sending:** send yourself a test, then schedule it or send now. Sending is limited to Sales and Admin.
+- **Who's skipped:** anyone who unsubscribed, opted out of that type, hard-bounced or marked a campaign as spam.
+- **What goes out:** email is sent through Postmark's Broadcast stream in batches of 500 from the dispatch cron, with opens and clicks tracked. Every email carries LimeChat's address, a preferences link and one-click unsubscribe headers (RFC 8058, required by Gmail and Yahoo).
+- **What comes back:** Postmark's webhook reports deliveries, opens, clicks, bounces (a hard bounce suppresses the address), spam complaints and unsubscribes. They show on the campaign's results.
+- **The preference page** (`/u/<token>`) is public and frameless. The link is signed and covers only its own address.
+
+Setup, once, in Postmark:
+1. Create a **Broadcast** message stream and set `POSTMARK_STREAM` to its ID.
+2. Verify the sending domain, for example `mail.limechat.ai`, by adding the DKIM and Return-Path records Postmark shows to DNS. Set `MAIL_FROM_DOMAIN` to it.
+3. Set `POSTMARK_SERVER_TOKEN` (Server → API Tokens) and `MAIL_POSTAL_ADDRESS`.
+4. On the Broadcast stream, add a webhook to `https://postmark:<POSTMARK_WEBHOOK_SECRET>@<host>/api/email/postmark` with Delivery, Open, Click, Bounce, Spam complaint and Subscription change ticked.
+
 ## Scheduled jobs
 
-[vercel.json](vercel.json) runs `/api/cron/dispatch` every 5 minutes (sends and retries), `/api/cron/mail` every 10 minutes (Gmail sync) and `/api/cron/daily` at 09:00 IST on weekdays (renewal reminders and morning digests). Both need `Authorization: Bearer $CRON_SECRET`; Vercel sends it automatically when `CRON_SECRET` is set. Elsewhere, call them from any scheduler with that header. Re-running is safe, because each message has a dedupe key.
+[vercel.json](vercel.json) runs `/api/cron/dispatch` every 5 minutes (Slack, webhooks and campaign email: sends, retries and scheduled campaigns), `/api/cron/mail` every 10 minutes (Gmail sync) and `/api/cron/daily` at 09:00 IST on weekdays (renewal reminders and morning digests). Both need `Authorization: Bearer $CRON_SECRET`; Vercel sends it automatically when `CRON_SECRET` is set. Elsewhere, call them from any scheduler with that header. Re-running is safe, because each message has a dedupe key.
 
 ## Scripts
 
